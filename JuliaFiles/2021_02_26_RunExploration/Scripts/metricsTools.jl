@@ -1,9 +1,9 @@
 module MetricsTools
 
-using Statistics
+using Statistics: mean
 
 # Masks can either be BitArrays or functions that take vectors
-const MASKTYPE(P) = Union{BitArray{P},Function}
+const MASKTYPE(P) = Union{BitArray{P}, Function, Nothing}
 
 # Array that allows missing type
 const MISSINGARRAY(T,P) = Array{Union{Missing, T}, P}
@@ -31,6 +31,8 @@ function maskArray(
         x_masked = x[computedMask]
     end
 
+    x_masked = reshape(x_masked, :, size(x)[2])
+
     return x_masked
 end
 
@@ -39,26 +41,37 @@ end
 
 Compute metrics of masked arrays.
 
+Note: Only works for 1 or 2 dim. arrays.
+
 """
 function computeMaskedMetric(
-    x::Vector,
+    # x::Array{Any, P},
+    x::Array,
     y::Vector,
     mask::MASKTYPE(1),
     metric::Function
 )
 
-    # Both x, y have to satisfy condition
     computedMask = mask(x) .& mask(y)
 
     x_masked = maskArray(x, computedMask)
-    y_masked = maskArray(y, computedMask)
+
+    if ndims(x) == 1
+        y_masked = maskArray(y, computedMask)
+    elseif ndims(x) == 2
+        y_masked = maskArray(
+            repeat(y, inner=(1,size(x)[2])),
+            computedMask)
+    else
+        throw(ErrorException("P must be 1 or 2."))
+    end
 
     computedMetric = metric(x_masked, y_masked)
 
     return computedMetric
 end
 
-RMSE(x, obs) = sqrt(mean((x .- obs).^2))
+RMSE(x::Array, obs::Array) = sqrt(mean((x .- obs).^2))
 
 computeMaskedRMSE(x, y, mask) = computeMaskedMetric(x, y, mask, RMSE)
 
