@@ -4,10 +4,13 @@
 
 using Printf
 
-cd("C:/Users/anike/Desktop/PhDUofM/NextGenSWMF/BaselineRunsExploration/")
-if !isdir("code_v_2021_02_07_96_Runs/")
-    mkdir("code_v_2021_02_07_96_Runs")
-    cd("code_v_2021_02_07_96_Runs/")
+# cd("C:/Users/anike/Desktop/PhDUofM/NextGenSWMF/BaselineRunsExploration/")
+maindir = expanduser("~/Dropbox/SWMF_QU/JuliaFiles/2021_02_26_RunExploration")
+runsdir = "code_v_2021_02_07_96_Runs/"
+cd(maindir)
+if !isdir(runsdir)
+    mkdir(runsdir)
+    cd(runsdir)
     for runIdx in 1:48
         dirName = @sprintf("run%03d_AWSoM", runIdx)
         mkdir(dirName)
@@ -17,11 +20,12 @@ if !isdir("code_v_2021_02_07_96_Runs/")
         mkdir(dirName)
     end
 end
-cd("../")
-parentDir = "C:/Users/anike/Desktop/PhDUofM/NextGenSWMF/BaselineRunsExploration/code_v_2021_02_07_96_Runs/";
+# cd("../")
+# parentDir = "C:/Users/anike/Desktop/PhDUofM/NextGenSWMF/BaselineRunsExploration/code_v_2021_02_07_96_Runs/";
+parentDir = joinpath(maindir, runsdir)
 
-
-ioLHS = open("C:/Users/anike/Desktop/PhDUofM/NextGenSWMF/BaselineRunsExploration/2021_02_06_04_51_17_event_list_randomized.txt");
+# ioLHS = open("C:/Users/anike/Desktop/PhDUofM/NextGenSWMF/BaselineRunsExploration/2021_02_06_04_51_17_event_list_randomized.txt");
+ioLHS = open(joinpath(maindir, "event_list_files", "2021_02_06_04_51_17_event_list_randomized.txt"))
 linesLHS = readlines(ioLHS);
 close(ioLHS);
 
@@ -47,10 +51,11 @@ realizationIdxList = getRealizationIdxList(linesLHS);
 
 # implement isdir function - since all run directories are not in dropbox
 
-srcParentDir = "C:\\Users\\anike\\Dropbox (University of Michigan)\\Results\\code_v_2021-02-07\\event_list_2021_02_06_04\\"
+# srcParentDir = "C:\\Users\\anike\\Dropbox (University of Michigan)\\Results\\code_v_2021-02-07\\event_list_2021_02_06_04\\"
+resultsdir = expanduser("~/DropboxFUSE/Results/code_v_2021-02-07/")
+srcParentDir = joinpath(resultsdir, "event_list_2021_02_06_04")
 srcDirs = readdir(srcParentDir);
 trjFileName = "trj_earth_n00005000.sat"; 
-
 
 for dir in srcDirs  
     m = match(r"run(\d+)_(AWSoM|AWSoMR)", dir);

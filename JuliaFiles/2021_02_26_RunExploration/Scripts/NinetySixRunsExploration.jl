@@ -5,12 +5,27 @@ using DataFrames
 using Printf
 using IterTools
 using Dates
+using JLD
 
 using PyCall
-using PyPlot
-@pyimport matplotlib.pyplot as pyplt
+# using PyPlot
+# @pyimport matplotlib.pyplot as pyplt
 
+# include("TrajectoriesTools.jl")
 include("TrajectoriesTools.jl")
+
+# IH_path = "C:/Users/anike/Desktop/PhDUofM/NextGenSWMF/BaselineRunsExploration/code_v_2021_02_07_96_Runs/run001_AWSoM/" * "trj_earth_n00005000.sat"
+resultsdir = expanduser("~/DropboxFUSE/Results/")
+juliafiles = expanduser("~/Dropbox/SWMF_QU/JuliaFiles/")
+eventlistdir = joinpath(
+    juliafiles,
+    "2021_02_26_RunExploration/event_list_files")
+obsdatadir = joinpath(resultsdir, "obsdata")
+
+IHpath = joinpath(resultsdir,
+                  "code_v_2021-02-07/baseline_runs/",
+                  "run001_AWSoM/run01/IH",
+                  "trj_earth_n00005000.sat")
 
 # Constants
 ProtonMass = 1.67e-24
@@ -32,7 +47,7 @@ elseif dataTrajectory == "STEREO-A"
 end
 
 # skip the first line, pick off the headings from the second.
-IHData, IHColumns = readdlm("C:/Users/anike/Desktop/PhDUofM/NextGenSWMF/BaselineRunsExploration/code_v_2021_02_07_96_Runs/run001_AWSoM/" * "trj_earth_n00005000.sat", header=true, skipstart=1)
+IHData, IHColumns = readdlm(IHpath, header=true, skipstart=1)
 
 m, n = size(IHData)
 
@@ -46,7 +61,8 @@ tmTicks = []
 plotXLabels = []
 obsFileDates = []
 
-ioLHS = open("C:/Users/anike/Desktop/PhDUofM/NextGenSWMF/BaselineRunsExploration/2021_02_06_04_51_17_event_list_randomized.txt");
+ioLHS = open(joinpath(eventlistdir,
+                      "2021_02_06_04_51_17_event_list_randomized.txt"));
 linesLHS = readlines(ioLHS);
 close(ioLHS);
 
@@ -54,12 +70,20 @@ close(ioLHS);
 realizationIdxList = TrajectoriesTools.getRealizationIdxList(linesLHS);
 
 
-ioBaseline = open("baseline_runs_16_event_list.txt")
+ioBaseline = open(joinpath(eventlistdir, "baseline_runs_16_event_list.txt"))
 linesBase = readlines(ioBaseline)
 close(ioBaseline)
 
 # Get the subplot titles (for example, GONG2208, ADAPT2209 etc)
 mapCRList = TrajectoriesTools.retrieveMapCRVals(linesBase)
+
+
+mapPath = joinpath(juliafiles,
+                   "2021_02_26_RunExploration",
+                   "output",
+                   "mapCRList.jld")
+
+save(mapPath, "mapCRList", mapCRList)
 
 # Calculate Radial speed (Ur)
 fUr(ux, uy, uz, x, y, z) = (ux*x + uy*y + uz*z)/sqrt(x^2 + y^2 + z^2) # one line function for convenience
@@ -71,7 +95,16 @@ for groupIdx = 1:numberOfGroups # This indexing will only get the AWSoMR runs
         modelUsed = "AWSoMR"
     end
     for fileIdx = (groupIdx - 1) * 6 + 1:(groupIdx)*6
-        opFileName = "C:/Users/anike/Desktop/PhDUofM/NextGenSWMF/BaselineRunsExploration/code_v_2021_02_07_96_Runs/" * "run"*@sprintf("%03d", fileIdx)*"_"*modelUsed*"/trj_earth_n00005000.sat"
+
+        opFileName = joinpath(
+            juliafiles,
+            "2021_02_26_RunExploration",
+            "code_v_2021_02_07_96_Runs",
+            "run"*@sprintf("%03d", fileIdx)*"_"*modelUsed,
+            "trj_earth_n00005000.sat"
+        )
+
+        # opFileName = "C:/Users/anike/Desktop/PhDUofM/NextGenSWMF/BaselineRunsExploration/code_v_2021_02_07_96_Runs/" * "run"*@sprintf("%03d", fileIdx)*"_"*modelUsed*"/trj_earth_n00005000.sat"
 
         # replace opFileName syntax with 'join' command
         
@@ -89,6 +122,8 @@ for groupIdx = 1:numberOfGroups # This indexing will only get the AWSoMR runs
             Np[:, fileIdx] = IHDF[!, :rho] ./ ProtonMass
             T[:, fileIdx] = (IHDF[!, :p]) .* ((ProtonMass ./ IHDF[!, :rho]) / k) * 1e-7
             B[:, fileIdx] = sqrt.(IHDF[!, :bx].^2 .+ IHDF[!, :by].^2 .+ IHDF[!, :bz].^2) * 1e5
+        else
+            println(opFileName*" doesn't exist!")
         end
     end
 end
@@ -101,7 +136,17 @@ for groupIdx = 1:numberOfGroups
         modelUsed = "AWSoMR"
     end
 
-    opFileName = "C:/Users/anike/Desktop/PhDUofM/NextGenSWMF/code_v_2021_02_07/BaselineRuns/" * "run"*@sprintf("%03d", groupIdx)*"_"*modelUsed*"/run01/IH/trj_earth_n00005000.sat"
+
+    opFileName = joinpath(
+            resultsdir,
+            "code_v_2021-02-07",
+            "baseline_runs",
+            "run"*@sprintf("%03d", groupIdx)*"_"*modelUsed,
+            "run01/IH",
+            "trj_earth_n00005000.sat"
+        )
+
+    # opFileName = "C:/Users/anike/Desktop/PhDUofM/NextGenSWMF/code_v_2021_02_07/BaselineRuns/" * "run"*@sprintf("%03d", groupIdx)*"_"*modelUsed*"/run01/IH/trj_earth_n00005000.sat"
 
     if isfile(opFileName)
         # process output file
@@ -116,6 +161,8 @@ for groupIdx = 1:numberOfGroups
         push!(tmTicks, range(tmPeriods[:, groupIdx][1] + Day(3), tmPeriods[:, groupIdx][end], step=Day(6)))
 
         push!(plotXLabels, Dates.format(Dates.DateTime(IHDF[1, :year], IHDF[1, :mo], IHDF[1, :dy], IHDF[1, :hr], IHDF[1, :mn], IHDF[1, :sc]), "dd-u-yy HH:MM:SS"))
+    else
+        println(opFileName*" doesn't exist!")
     end
 end
 
@@ -137,7 +184,9 @@ BObserved = zeros(m - 1, numberOfGroups)
 # Load observation data
 for (obsIdx, dt) in enumerate(obsFileDates)
 
-    obsFileName = "C:/Users/anike/Desktop/PhDUofM/NextGenSWMF/obsdata/"* obsFilePrefix * "_" * dt * ".out"
+    obsFileName = joinpath(obsdatadir,
+                           obsFilePrefix*"_"*dt*".out")
+    # obsFileName = "C:/Users/anike/Desktop/PhDUofM/NextGenSWMF/obsdata/"* obsFilePrefix * "_" * dt * ".out"
     obsData, obsColumns = readdlm(obsFileName, header=true, skipstart=3)
 
     ObsDF = DataFrame(obsData)
@@ -152,6 +201,29 @@ for (obsIdx, dt) in enumerate(obsFileDates)
 end
 
 println("Data pushed into respective arrays")
+
+# Save arrays
+observedQOIpath = joinpath(juliafiles,
+                      "2021_02_26_RunExploration",
+                      "output",
+                      "obs_qoi_96runs.jld")
+QOIpath = joinpath(juliafiles,
+                   "2021_02_26_RunExploration",
+                   "output",
+                   "qoi_96runs.jld")
+save(observedQOIpath,
+     "UrObserved", UrObserved,
+     "NpObserved", NpObserved,
+     "TObserved", TObserved,
+     "BObserved", BObserved,
+     )
+save(QOIpath,
+     "Ur", Ur,
+     "Np", Np,
+     "T", T,
+     "B", B,
+     )
+
 
 """
 @Name(x)
@@ -231,7 +303,3 @@ function plotQoIMultipleRealizations((varName, varNameLabel), observationArray, 
     figureQoI.suptitle(varNameLabel * "_" * dataTrajectory)
     figureQoI.set_size_inches(12.5, 13.9)
 end
-
-
-
-

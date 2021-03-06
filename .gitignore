@@ -1,3 +1,4 @@
 /reference/
 /__pycache__/
 /plots/
+/.dir-locals.el
