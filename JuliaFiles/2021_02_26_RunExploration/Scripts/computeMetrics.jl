@@ -3,14 +3,15 @@ using JLD, Statistics, IterTools, DataFrames, CSV
 include("metricsTools.jl")
 
 function computeMetric(
-    func::Function,
+    func::T,
     trajDict::Dict,
     file::String,
     mask::Union{Nothing, Function}=nothing,
     mapCR=nothing,
     obsDict::Union{Nothing, Dict}=nothing,
     nparts::Int=6,
-)
+    kwargs...
+) where {T<:Function}
 
     metrics = Dict()
 
@@ -37,8 +38,17 @@ function computeMetric(
                 currgroupObs = nothing
             end
 
-            metrics[key][i] = round(func(currgroupQOI, currgroupObs, mask),
-                                    digits=3)
+            # TODO: Find better way to do this
+            if (T <: typeof(MetricsTools.computeShiftedMaskedRMSE)
+                || T <: typeof(computeShiftedMaskedRMSE))
+
+                resDict = func(currgroupQOI, currgroupObs, mask, kwargs...)
+                metrics[key][i] = round(resDict["RMSE"], digits=3)
+            else
+                metrics[key][i] = round(
+                    func(currgroupQOI, currgroupObs, mask, kwargs...),
+                    digits=3)
+            end
         end
     end
 
@@ -62,20 +72,21 @@ obsDict = load("output/obs_qoi_96runs.jld")
 
 mapCR = mapCRList["mapCRList"]
 
-relVar(x, obs=nothing) = sqrt(mean(var(x, corrected=false, dims=2))) / mean(x)
-path = "output/relvar_96runs.csv"
-
-if !isfile(path)
-    computeMetric(
-        relVar,
-        trajDict,
-        path,
-        mapCR,
-    )
-end
-
-RMSE(x, obs) = sqrt(mean((x .- obs).^2))
 mask(x) = x .> 0
+
+# relVar(x, obs=nothing) = sqrt(mean(var(x, corrected=false, dims=2))) / mean(x)
+# path = "output/relvar_96runs.csv"
+
+# if !isfile(path)
+#     computeMetric(
+#         relVar,
+#         trajDict,
+#         path,
+#         mask,
+#         mapCR,
+#     )
+# end
+
 path = "output/rmse_96runs.csv"
 
 if !isfile(path)
@@ -87,4 +98,25 @@ if !isfile(path)
         mapCR,
         obsDict
     )
+end
+
+path = "output/shifted_rmse_96runs.csv"
+
+timeshifts = collect(1:48)
+Tmins = collect(0.1:0.025:0.25)
+Tmaxs = collect(0.70:0.025:0.85)
+
+function computeShiftedMaskedRMSE(x, y, mask)
+    MetricsTools.computeShiftedMaskedRMSE(
+    x, y, timeshifts, mask, Tmins, Tmaxs, verbose=true)
+end
+if !isfile(path)
+    computeMetric(
+        computeShiftedMaskedRMSE,
+        # MetricsTools.computeShiftedMaskedRMSE,
+        trajDict,
+        path,
+        mask,
+        mapCR,
+        obsDict)
 end
