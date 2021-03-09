@@ -1,76 +1,85 @@
-using JLD, Statistics, IterTools, DataFrames, CSV
+using JLD, Statistics, IterTools, DataFrames, JSON
+# using CSV
 
 include("metricsTools.jl")
 
-function computeMetric(
-    func::T,
-    trajDict::Dict,
-    file::String,
-    mask::Union{Nothing, Function}=nothing,
-    mapCR=nothing,
-    obsDict::Union{Nothing, Dict}=nothing,
-    nparts::Int=6,
-    kwargs...
-) where {T<:Function}
+function computemetric_onevar(
+    metricfunc::Function,
+    qoi::Array,
+    obs::Union{Nothing,Array}=nothing;
+    nparts::Integer=6,
+    mapCR_list::Union{Nothing, Vector}=nothing,
+    model_list::Union{Nothing, Vector}=nothing,
+)
 
-    metrics = Dict()
+    # Partition columns of QOI array
+    part = partition(axes(qoi, 2), nparts)
 
-    for key = keys(trajDict)
+    # Iterate through trajectories for one QOI
+    # NOTE: metricfunc can return anything (i.e. Dict, Array, etc)
+    metrics = map(enumerate(part)) do (i, cols)
+        # i, cols = enum
 
-        obsKey = key * "Observed"
-        qoi = trajDict[key]
+        current_qoi = qoi[:, [cols...]]
 
-        if !isnothing(obsDict)
-            obs = obsDict[obsKey]
+        if !isnothing(obs)
+            current_obs = obs[:,i]
         else
-            obs = nothing
+            current_obs = nothing
         end
 
-        metrics[key] = zeros(Int(size(qoi)[2] / nparts))
-        part = partition(axes(qoi, 2), nparts)
+        result = metricfunc(current_qoi, current_obs)
 
-        for (i, cols) in enumerate(part)
-            currgroupQOI = qoi[:, [cols...]]
+        # if typeof(result) <: Dict
+        #     result["mapCR"] = mapCR_list[i]
+        #     result["model"] = model_list[i]
+        # # TODO: What to do if not dictionary?
+        # end
 
-            if !isnothing(obs)
-                currgroupObs = obs[:,i]
-            else
-                currgroupObs = nothing
-            end
-
-            # TODO: Find better way to do this
-            if (T <: typeof(MetricsTools.computeShiftedMaskedRMSE)
-                || T <: typeof(computeShiftedMaskedRMSE))
-
-                resDict = func(currgroupQOI, currgroupObs, mask, kwargs...)
-                metrics[key][i] = round(resDict["RMSE"], digits=3)
-            else
-                metrics[key][i] = round(
-                    func(currgroupQOI, currgroupObs, mask, kwargs...),
-                    digits=3)
-            end
-        end
+        return result
     end
 
-    metrics_df = DataFrame(metrics)
+    new_keys = collect(zip(mapCR_list, model_list))
+    metrics_dict = Dict(new_keys .=> metrics)
 
-    if !isnothing(mapCR)
-        insert!(metrics_df, 1, mapCR, :mapCR)
-        # metrics_df["mapCR"] = mapCR
-    end
+    return metrics_dict
 
-    # CSV.write(file, metrics_df[!, [:mapCR, :B, :Np, :T, :Ur]])
-    CSV.write(file, metrics_df)
-
-    # save(file, metrics)
-    # return metrics
 end
 
-mapCRList = load("output/mapCRList.jld")
+
+function compute_metrics(
+    metricfunc::Function,
+    trajDict::Dict,
+    obsDict::Union{Nothing, Dict}=nothing;
+    nparts::Int=6,
+    mapCR_list::Union{Nothing, Vector}=nothing,
+    model_list::Union{Nothing, Vector}=nothing
+)
+
+    # Iterate through quantities of interest
+    metric_tuples = map(keys(trajDict), values(trajDict)) do key, qoi
+
+        obs = isnothing(obsDict) ? nothing : obsDict[key * "Observed"]
+        value = computemetric_onevar(metricfunc, qoi, obs, nparts=nparts,
+                                     mapCR_list=mapCR_list, model_list=model_list)
+
+        return key, value
+
+    end
+
+    metrics_dict = Dict(metric_tuples)
+
+    return metrics_dict
+
+end
+
+
+mapCR = load("output/mapCRList.jld")
 trajDict = load("output/qoi_96runs.jld")
 obsDict = load("output/obs_qoi_96runs.jld")
 
-mapCR = mapCRList["mapCRList"]
+mapCR_list = mapCR["mapCRList"]
+model_list = vcat(repeat(["AWSoM"], 8), repeat(["AWSoMR"], 8))
 
 mask(x) = x .> 0
 
@@ -87,36 +96,55 @@ mask(x) = x .> 0
 #     )
 # end
 
-path = "output/rmse_96runs.csv"
+# path = "output/rmse_96runs.csv"
 
-if !isfile(path)
-    computeMetric(
-        MetricsTools.computeMaskedRMSE,
-        trajDict,
-        path,
-        mask,
-        mapCR,
-        obsDict
-    )
+# if !isfile(path)
+#     computeMetric(
+#         MetricsTools.computeMaskedRMSE,
+#         trajDict,
+#         path,
+#         mask,
+#         mapCR,
+#         obsDict
+#     )
+# end
+
+timeshifts = collect(0:72)
+Tmins = collect(0:0.01:0.3)
+Tmaxs = collect(0.70:0.01:1)
+dims = 2
+funcs = [mean, minimum, median, maximum, std]
+sortBy=1
+
+metricfunc(traj, obs) = MetricsTools.computeShiftedMaskedRMSE(
+    traj, obs, mask, timeshifts, Tmins, Tmaxs, dims=dims, funcs=funcs,
+    sortBy=sortBy)
+
+metrics = compute_metrics(metricfunc, trajDict, obsDict,
+                          mapCR_list=mapCR_list,
+                          model_list=model_list)
+
+metrics_json = json(metrics)
+
+open("output/shifted_metrics_dict.json", "w") do f
+    write(f, metrics_json)
 end
 
-path = "output/shifted_rmse_96runs.csv"
+save("output/shifted_metrics_dict.jld", metrics)
 
-timeshifts = collect(1:48)
-Tmins = collect(0.1:0.025:0.25)
-Tmaxs = collect(0.70:0.025:0.85)
-
-function computeShiftedMaskedRMSE(x, y, mask)
-    MetricsTools.computeShiftedMaskedRMSE(
-    x, y, timeshifts, mask, Tmins, Tmaxs, verbose=true)
-end
-if !isfile(path)
-    computeMetric(
-        computeShiftedMaskedRMSE,
-        # MetricsTools.computeShiftedMaskedRMSE,
-        trajDict,
-        path,
-        mask,
-        mapCR,
-        obsDict)
-end
+# function computeShiftedMaskedRMSE(x, y, mask; kwargs...)
+#     MetricsTools.computeShiftedMaskedRMSE(
+#     x, y, mask, timeshifts, Tmins, Tmaxs, kwargs...)
+# end
+# if !isfile(path)
+#     computeMetric(
+#         computeShiftedMaskedRMSE,
+#         # MetricsTools.computeShiftedMaskedRMSE,
+#         trajDict,
+#         path,
+#         mask,
+#         mapCR,
+#         obsDict,
+#         # verbose=true
+#     )
+# end

@@ -85,62 +85,113 @@ Shift x (if shiftx, else y) by timeshift by appending/prepending missing values
 and subset to [Tmin:Tmax]
 
 """
+# TODO: Change name to shiftTrimArray
 function shiftArray(x::Array, y::Array,
                     timeshift::Int,
                     Tmin::Float64,
                     Tmax::Float64,
                     shiftx::Bool=true)
-    # TODO: Check if x,y have same length
 
-    # xShifted = copy(allowmissing(x))
-    # yShifted = copy(allowmissing(y))
+    @assert size(x)[1] == size(y)[1] "x, y don't have the same number of columns!"
 
-    # xShifted = allowmissing(x)
-    # yShifted = allowmissing(y)
+    function getMissingArray(z)
+        if ndims(z) > 1
+            missingArray = repeat([missing], timeshift, size(z)[2])
+        else
+            missingArray = repeat([missing], timeshift)
+        end
 
-    if ndims(x) > 1
-        missingArray = repeat([missing], timeshift, size(x)[2])
-    else
-        missingArray = repeat([missing], timeshift)
+        return missingArray
     end
 
     if shiftx
-        xShifted = vcat(missingArray, x)
-        yShifted = vcat(y, missingArray)
+        xShifted = vcat(getMissingArray(x), x)
+        yShifted = vcat(y, getMissingArray(y))
     else
-        yShifted = vcat(missingArray, y)
-        xShifted = vcat(x, missingArray)
+        xShifted = vcat(x, getMissingArray(x))
+        yShifted = vcat(y, getMissingArray(y))
     end
 
     TminIdx = Int(ceil(Tmin * size(xShifted)[1]))
+
+    if Tmin == 0
+        TminIdx = TminIdx + 1
+    end
+
     TmaxIdx = Int(floor(Tmax * size(xShifted)[1]))
 
-    xShifted = xShifted[TminIdx:TmaxIdx]
-    yShifted = yShifted[TminIdx:TmaxIdx]
+    if ndims(x) > 1
+        xShifted = xShifted[TminIdx:TmaxIdx,:]
+    else
+        xShifted = xShifted[TminIdx:TmaxIdx]
+    end
+
+    if ndims(y) > 1
+        yShifted = yShifted[TminIdx:TmaxIdx,:]
+    else
+        yShifted = yShifted[TminIdx:TmaxIdx]
+    end
 
     return xShifted, yShifted
 
 end
 
+
+# Not used anymore
+function findNonMissing(x::Array; dims::Union{Int,Nothing}=nothing)
+    if isnothing(dims) || ndims(x) == 1
+       return .!ismissing.(x)
+    else
+        return findall(.!any(ismissing.(x), dims=dims)[:,1])
+    end
+
+end
+
+function meanNA(x::Array; dims::Union{Int,Nothing}=nothing)
+    if isnothing(dims) || ndims(x) == 1
+        return mean(skipmissing(x))
+    else
+       return map(mean, skipmissing.(eachslice(x, dims=dims)))
+    end
+
+end
+
 """
+
     function shiftedRMSE(x::Array, y::Array, timeshift::Int,
                         Tmin::Int, Tmax::Int, shiftx::Bool=true)
 
 Shift x,y using shiftArray and compute RMSE on non-missing indices.
 
 """
-function shiftedRMSE(x::Array,
-                     y::Array,
-                     timeshift::Int,
-                     Tmin::Float64,
-                     Tmax::Float64,
-                     shiftx::Bool=true)
+function shiftedRMSE(
+    x::Array,
+    y::Array,
+    timeshift::Int,
+    Tmin::Float64,
+    Tmax::Float64;
+    shiftx::Bool=true,
+    square::Bool=false,
+    dims::Union{Nothing, Int}=nothing
+)
 
     xShifted, yShifted = shiftArray(x, y, timeshift,
                                     Tmin, Tmax, shiftx)
 
-    sqDiff = skipmissing((xShifted .- yShifted).^2)
-    rmse = sqrt(mean(sqDiff))
+    sqDiff = (xShifted .- yShifted).^2
+    rmse = meanNA(sqDiff, dims=dims)
+
+    # sqDiff = collect(skipmissing((xShifted .- yShifted).^2))
+
+    # if !isnothing(dims) && ndims(x) > 1
+    #     rmse = mean(sqDiff, dims=dims)
+    # else
+    #     rmse = mean(sqDiff)
+    # end
+
+    if !square
+        rmse = sqrt.(rmse)
+    end
 
     return rmse
 end
@@ -158,22 +209,47 @@ If RMSEonly, return the minimum RMSE. Otherwise, return a dictionary with
 the best parameters and RMSE.
 
 """
-function computeShiftedRMSE(x::Array, y::Array, timeshifts::Vector,
-                            Tmins::Vector{Float64}, Tmaxs::Vector{Float64},
-                            shiftx::Bool=true, RMSEonly::Bool=false,
+function computeShiftedRMSE(x::Array, y::Array,
+                            timeshifts::Vector,
+                            Tmins::Vector{Float64},
+                            Tmaxs::Vector{Float64};
+                            shiftx::Bool=true,
+                            RMSEonly::Bool=false,
+                            dims::Union{Nothing, Int}=nothing,
+                            funcs::Vector=[median],
+                            sortBy::Int=1,
                             verbose::Bool=false)
 
+    # TODO: Modify to allow different functions of the RMSE vector if dims > 1
+
+    RMSEisVector = !ismissing(dims) && ndims(x) > 1
+
     # Initialize array to store RMSEs
-    res = zeros(size(timeshifts)[1],
-                size(Tmins)[1],
-                size(Tmaxs)[1])
+    if RMSEisVector
+        res = allowmissing(
+            zeros(size(timeshifts)[1],
+                  size(Tmins)[1],
+                  size(Tmaxs)[1],
+                  length(funcs)))
+    else
+        res = allowmissing(
+            zeros(size(timeshifts)[1],
+                  size(Tmins)[1],
+                  size(Tmaxs)[1]))
+    end
 
     # Gridsearch
     for (i, timeshift) in enumerate(timeshifts)
         for (j, Tmin) in enumerate(Tmins)
             for (k, Tmax) in enumerate(Tmaxs)
 
-                res[i,j,k] = shiftedRMSE(x, y, timeshift, Tmin, Tmax)
+                rmse = shiftedRMSE(x, y, timeshift, Tmin, Tmax,
+                                   shiftx=shiftx, dims=dims)
+                if RMSEisVector
+                    res[i,j,k,:] = map((f) -> f(rmse), funcs)
+                else
+                    res[i,j,k] = rmse
+                end
 
                 if verbose
                     println("RMSE for timeshift=$timeshift, Tmin=$Tmin, Tmax=$Tmax: $(res[i,j,k])")
@@ -183,18 +259,35 @@ function computeShiftedRMSE(x::Array, y::Array, timeshifts::Vector,
         end
     end
 
+    @assert !all(ismissing.(res)) "RMSE's are all missing!"
+
+    if RMSEisVector
+        bestIdx = argmin(skipmissing(res[:,:,:,sortBy]))
+        sortedres = res[bestIdx,:]
+    else
+        bestIdx = argmin(skipmissing(res))
+        sortedres = res[bestIdx]
+    end
+
     if RMSEonly
         # Only return the minimum RMSE
-        return minimum(res)
+        return minimum(skipmissing(sortedres))
     else
         # Return a dictionary with the best parameters and RMSE
-        bestIdx = argmin(res)
+
+        bestTimeshift = length(timeshifts) == 1 ? 1 : timeshifts[bestIdx[1]]
+        bestTmin = length(Tmins) == 1 ? 1 : Tmins[bestIdx[2]]
+        bestTmax = length(Tmaxs) == 1 ? 1 : Tmaxs[bestIdx[3]]
+
+        funcNames = String.(Symbol.(funcs))
+        RMSEdict = Dict(funcNames .=> sortedres)
 
         resDict = Dict(
-        "RMSE" => res[bestIdx],
-        "timeshift" => timeshifts[bestIdx[1]],
-        "Tmin" => Tmins[bestIdx[2]],
-        "Tmax" => Tmaxs[bestIdx[3]],
+            "RMSE" => sortedres[sortBy],
+            "RMSEdict" => RMSEdict,
+            "timeshift" => bestTimeshift,
+            "Tmin" => bestTmin,
+            "Tmax" => bestTmax
         )
 
         return resDict
@@ -202,13 +295,23 @@ function computeShiftedRMSE(x::Array, y::Array, timeshifts::Vector,
 
 end
 
-function computeShiftedMaskedRMSE(x, y, timeshifts, mask,
-                                  Tmins, Tmaxs; shiftx=true, RMSEonly=false,
+function computeShiftedMaskedRMSE(x, y, mask, timeshifts, Tmins, Tmaxs;
+                                  shiftx=true,
+                                  dims=nothing,
+                                  funcs=[mean],
+                                  sortBy=1,
+                                  RMSEonly=false,
                                   verbose=false)
 
     rmse = computeMaskedMetric(
         x, y, mask,
-        (x, y) -> computeShiftedRMSE(x, y, timeshifts, Tmins, Tmaxs, shiftx, RMSEonly, verbose)
+        (x, y) -> computeShiftedRMSE(x, y, timeshifts, Tmins, Tmaxs,
+                                     shiftx=shiftx,
+                                     dims=dims,
+                                     funcs=funcs,
+                                     sortBy=sortBy,
+                                     RMSEonly=RMSEonly,
+                                     verbose=verbose)
     )
 
     return rmse
