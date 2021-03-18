@@ -83,35 +83,9 @@ model_list = vcat(repeat(["AWSoM"], 8), repeat(["AWSoMR"], 8))
 
 mask(x) = x .> 0
 
-# relVar(x, obs=nothing) = sqrt(mean(var(x, corrected=false, dims=2))) / mean(x)
-# path = "output/relvar_96runs.csv"
-
-# if !isfile(path)
-#     computeMetric(
-#         relVar,
-#         trajDict,
-#         path,
-#         mask,
-#         mapCR,
-#     )
-# end
-
-# path = "output/rmse_96runs.csv"
-
-# if !isfile(path)
-#     computeMetric(
-#         MetricsTools.computeMaskedRMSE,
-#         trajDict,
-#         path,
-#         mask,
-#         mapCR,
-#         obsDict
-#     )
-# end
-
-timeshifts = collect(0:72)
-Tmins = collect(0:0.01:0.3)
-Tmaxs = collect(0.70:0.01:1)
+timeshifts = collect(-72:72)
+Tmins = collect(0.1:0.01:0.40)
+Tmaxs = collect(0.60:0.01:0.9)
 dims = 2
 funcs = [mean, minimum, median, maximum, std]
 sortBy=1
@@ -131,20 +105,3 @@ open("output/shifted_metrics_dict.json", "w") do f
 end
 
 save("output/shifted_metrics_dict.jld", metrics)
-
-# function computeShiftedMaskedRMSE(x, y, mask; kwargs...)
-#     MetricsTools.computeShiftedMaskedRMSE(
-#     x, y, mask, timeshifts, Tmins, Tmaxs, kwargs...)
-# end
-# if !isfile(path)
-#     computeMetric(
-#         computeShiftedMaskedRMSE,
-#         # MetricsTools.computeShiftedMaskedRMSE,
-#         trajDict,
-#         path,
-#         mask,
-#         mapCR,
-#         obsDict,
-#         # verbose=true
-#     )
-# end

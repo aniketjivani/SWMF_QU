@@ -1,13 +1,13 @@
 module MetricsTools
 
 using Missings
-using Statistics: mean
+using Statistics: mean, median
 
 # Masks can either be BitArrays or functions that take vectors
-const MASKTYPE(P) = Union{BitArray{P}, Function, Nothing}
+const MASKTYPE(P) = Union{BitArray{P},Function,Nothing}
 
 # Array that allows missing type
-const MISSINGARRAY(T,P) = Array{Union{Missing, T}, P}
+const MISSINGARRAY(T, P) = Array{Union{Missing,T},P}
 
 @doc raw"""
     maskArray(x::Array{T,P}, mask::Union{BitArray{P},Function})
@@ -19,9 +19,9 @@ function maskArray(
     x::Array{T,P},
     mask::MASKTYPE(P),
     # mask::Union{BitArray{P},Function}
-)::MISSINGARRAY(T,P) where {T,P}
+)::MISSINGARRAY(T, P) where {T,P}
 
-    if !(T <: Union{Missing, Any})
+    if !(T <: Union{Missing,Any})
         x = convert(Array{Union{T,Missing},P}, x)
     end
 
@@ -63,7 +63,7 @@ function computeMaskedMetric(
         y_masked = maskArray(y, computedMask)
     elseif ndims(x) == 2
         y_masked = maskArray(
-            repeat(y, inner=(1,size(x)[2])),
+            repeat(y, inner=(1, size(x)[2])),
             computedMask)
     else
         throw(ErrorException("P must be 1 or 2."))
@@ -77,87 +77,74 @@ end
 RMSE(x::Array, obs::Array) = sqrt(mean((x .- obs).^2))
 computeMaskedRMSE(x, y, mask) = computeMaskedMetric(x, y, mask, RMSE)
 
-@doc raw"""
-    function shiftArray(x::Array, y::Array, timeshift::Int,
-                        Tmin::Int, Tmax::Int, shiftx::Bool=true)
 
-Shift x (if shiftx, else y) by timeshift by appending/prepending missing values
-and subset to [Tmin:Tmax]
-
-"""
-# TODO: Change name to shiftTrimArray
-function shiftArray(x::Array, y::Array,
-                    timeshift::Int,
-                    Tmin::Float64,
-                    Tmax::Float64,
-                    shiftx::Bool=true)
-
-    @assert size(x)[1] == size(y)[1] "x, y don't have the same number of columns!"
-
-    function getMissingArray(z)
-        if ndims(z) > 1
-            missingArray = repeat([missing], timeshift, size(z)[2])
-        else
-            missingArray = repeat([missing], timeshift)
-        end
-
-        return missingArray
-    end
-
-    if shiftx
-        xShifted = vcat(getMissingArray(x), x)
-        yShifted = vcat(y, getMissingArray(y))
+function _get_missing_array(z, timeshift)
+    if ndims(z) > 1
+        missingArray = repeat([missing], timeshift, size(z)[2])
     else
-        xShifted = vcat(x, getMissingArray(x))
-        yShifted = vcat(y, getMissingArray(y))
+        missingArray = repeat([missing], timeshift)
     end
 
-    TminIdx = Int(ceil(Tmin * size(xShifted)[1]))
+    return missingArray
+end
+
+
+function shift_array(x::Array, y::Array, timeshift::Int)
+
+    @assert size(x)[1] == size(y)[1] "x, y don't have the same number of rows!"
+
+    # Shift x if timeshift > 0
+    # Shift y if timeshift < 0
+    if timeshift > 0
+        x_shifted = vcat(_get_missing_array(x, timeshift), x)
+        y_shifted = vcat(y, _get_missing_array(y, timeshift))
+
+    else
+        x_shifted = vcat(x, _get_missing_array(x, -timeshift))
+        y_shifted = vcat(_get_missing_array(y, -timeshift), y)
+    end
+
+    return x_shifted, y_shifted
+
+end
+
+function trim_array(x, y, Tmin, Tmax)
+
+
+    TminIdx = Int(ceil(Tmin * size(x)[1]))
 
     if Tmin == 0
         TminIdx = TminIdx + 1
     end
 
-    TmaxIdx = Int(floor(Tmax * size(xShifted)[1]))
+    TmaxIdx = Int(floor(Tmax * size(x)[1]))
 
     if ndims(x) > 1
-        xShifted = xShifted[TminIdx:TmaxIdx,:]
+        xTrimmed = x[TminIdx:TmaxIdx,:]
     else
-        xShifted = xShifted[TminIdx:TmaxIdx]
+        xTrimmed = x[TminIdx:TmaxIdx]
     end
 
     if ndims(y) > 1
-        yShifted = yShifted[TminIdx:TmaxIdx,:]
+        yTrimmed = y[TminIdx:TmaxIdx,:]
     else
-        yShifted = yShifted[TminIdx:TmaxIdx]
+        yTrimmed = y[TminIdx:TmaxIdx]
     end
 
-    return xShifted, yShifted
+    return xTrimmed, yTrimmed
 
 end
 
+function shift_trim_array(x, y, timeshift, Tmin, Tmax)
 
-# Not used anymore
-function findNonMissing(x::Array; dims::Union{Int,Nothing}=nothing)
-    if isnothing(dims) || ndims(x) == 1
-       return .!ismissing.(x)
-    else
-        return findall(.!any(ismissing.(x), dims=dims)[:,1])
-    end
+    x_shifted, y_shifted = shift_array(x, y, timeshift)
+    x_trimmed, y_trimmed = trim_array(x_shifted, y_shifted, Tmin, Tmax)
 
-end
-
-function meanNA(x::Array; dims::Union{Int,Nothing}=nothing)
-    if isnothing(dims) || ndims(x) == 1
-        return mean(skipmissing(x))
-    else
-       return map(mean, skipmissing.(eachslice(x, dims=dims)))
-    end
+    return x_trimmed, y_trimmed
 
 end
 
 """
-
     function shiftedRMSE(x::Array, y::Array, timeshift::Int,
                         Tmin::Int, Tmax::Int, shiftx::Bool=true)
 
@@ -172,22 +159,13 @@ function shiftedRMSE(
     Tmax::Float64;
     shiftx::Bool=true,
     square::Bool=false,
-    dims::Union{Nothing, Int}=nothing
+    dims::Union{Nothing,Int}=nothing
 )
 
-    xShifted, yShifted = shiftArray(x, y, timeshift,
-                                    Tmin, Tmax, shiftx)
+    xShifted, yShifted = shift_trim_array(x, y, timeshift, Tmin, Tmax)
 
     sqDiff = (xShifted .- yShifted).^2
     rmse = meanNA(sqDiff, dims=dims)
-
-    # sqDiff = collect(skipmissing((xShifted .- yShifted).^2))
-
-    # if !isnothing(dims) && ndims(x) > 1
-    #     rmse = mean(sqDiff, dims=dims)
-    # else
-    #     rmse = mean(sqDiff)
-    # end
 
     if !square
         rmse = sqrt.(rmse)
@@ -215,7 +193,7 @@ function computeShiftedRMSE(x::Array, y::Array,
                             Tmaxs::Vector{Float64};
                             shiftx::Bool=true,
                             RMSEonly::Bool=false,
-                            dims::Union{Nothing, Int}=nothing,
+                            dims::Union{Nothing,Int}=nothing,
                             funcs::Vector=[median],
                             sortBy::Int=1,
                             verbose::Bool=false)
