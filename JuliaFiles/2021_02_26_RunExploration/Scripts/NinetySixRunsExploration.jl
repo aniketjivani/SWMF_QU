@@ -6,6 +6,7 @@ using Printf
 using IterTools
 using Dates
 using JLD
+using AxisArrays
 
 using PyCall
 # using PyPlot
@@ -202,28 +203,75 @@ end
 
 println("Data pushed into respective arrays")
 
-# Save arrays
-observedQOIpath = joinpath(juliafiles,
-                      "2021_02_26_RunExploration",
-                      "output",
-                      "obs_qoi_96runs.jld")
-QOIpath = joinpath(juliafiles,
+###########################################################################
+# Daniel
+
+
+# Store simulation, observations as AxisArrays for easier indexing
+# Last dim is QOI
+
+modelList = ["AWSoM", "AWSoMR"]
+mapCR = unique(mapCRList)
+
+n_times = size(Ur)[1]
+n_runs = 6
+n_mapCR = length(mapCR)
+n_qois = 4
+n_models = length(modelList)
+times = 1:n_times
+runs=1:n_runs
+
+traj = reshape([Ur Np T B], n_times, n_runs, n_mapCR, n_models, n_qois)
+traj = AxisArray(traj,
+                 t=times,
+                 run=runs,
+                 mapCR=mapCR,
+                 model=modelList,
+                 qoi=[:Ur, :Np, :T, :B])
+obs = reshape([UrObserved NpObserved TObserved BObserved],
+              n_times, n_mapCR, n_models, n_qois)
+obs = AxisArray(obs,
+                t=times,
+                mapCR=mapCR,
+                model=modelList,
+                qoi=[:Ur, :Np, :T, :B])
+
+# Save
+
+path = joinpath(juliafiles,
                    "2021_02_26_RunExploration",
                    "output",
-                   "qoi_96runs.jld")
-save(observedQOIpath,
-     "UrObserved", UrObserved,
-     "NpObserved", NpObserved,
-     "TObserved", TObserved,
-     "BObserved", BObserved,
-     )
-save(QOIpath,
-     "Ur", Ur,
-     "Np", Np,
-     "T", T,
-     "B", B,
-     )
+                   "qoi_arrays.jld")
 
+save(path,
+     "traj", traj,
+     "obs", obs)
+
+
+# I previously stored them as dictionaries but this made it harder to index
+# by anthing other than QOI
+# observedQOIpath = joinpath(juliafiles,
+#                       "2021_02_26_RunExploration",
+#                       "output",
+#                       "obs_qoi_96runs.jld")
+# QOIpath = joinpath(juliafiles,
+#                    "2021_02_26_RunExploration",
+#                    "output",
+#                    "qoi_96runs.jld")
+# save(observedQOIpath,
+#      "UrObserved", UrObserved,
+#      "NpObserved", NpObserved,
+#      "TObserved", TObserved,
+#      "BObserved", BObserved,
+#      )
+# save(QOIpath,
+#      "Ur", Ur,
+#      "Np", Np,
+#      "T", T,
+#      "B", B,
+#      )
+
+###########################################################################
 
 """
 @Name(x)
