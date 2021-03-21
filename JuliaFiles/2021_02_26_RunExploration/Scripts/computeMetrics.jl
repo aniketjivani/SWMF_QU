@@ -1,107 +1,91 @@
-using JLD, Statistics, IterTools, DataFrames, JSON
+using JLD, Statistics, IterTools, DataFrames, JSON, AxisArrays
 # using CSV
 
 include("metricsTools.jl")
 
-function computemetric_onevar(
-    metricfunc::Function,
-    qoi::Array,
-    obs::Union{Nothing,Array}=nothing;
-    nparts::Integer=6,
-    mapCR_list::Union{Nothing, Vector}=nothing,
-    model_list::Union{Nothing, Vector}=nothing,
-)
 
-    # Partition columns of QOI array
-    part = partition(axes(qoi, 2), nparts)
+function compute_metrics(metricfunc::Function,
+                         traj::AxisArray,
+                         obs::AxisArray;
+                         verbose=false,
+                         kwargs...)
+    # Computes an array where each element is the metric value for
+    # a specific mapCR, model, and run
+    # TODO: Take functions (i.e. min) over axes
 
-    # Iterate through trajectories for one QOI
-    # NOTE: metricfunc can return anything (i.e. Dict, Array, etc)
-    metrics = map(enumerate(part)) do (i, cols)
-        # i, cols = enum
+    ## Get mapCR and model list
+    mapCRs = AxisArrays.axes(traj)[3]
+    models = AxisArrays.axes(traj)[4]
 
-        current_qoi = qoi[:, [cols...]]
+    ## Initialize AxisArray to store metric values
+    metrics_size = size(traj)[2:end]
+    # Axes are the same as traj except for the first (time) axis
+    metrics_axes = AxisArrays.axes(traj)[2:end]
+    metrics = AxisArray(missings(Float64, metrics_size),
+                        metrics_axes)
 
-        if !isnothing(obs)
-            current_obs = obs[:,i]
-        else
-            current_obs = nothing
+    # Get dict with axes, values as key, pairs
+    ax = MetricsTools.axesdict(traj)
+
+    ## Iterate over mapCR, model, and run
+    for mapCR = ax[:mapCR], model = ax[:model], run = ax[:run]
+
+        if verbose
+            println("mapCR=$mapCR, model=$model, run=$run")
         end
 
-        result = metricfunc(current_qoi, current_obs)
+        idx = (Axis{:mapCR}(mapCR), Axis{:model}(model), Axis{:run}(run))
+        # metrics[idx...] is the same as metrics[mapCR=mapCR,model=model,run=run]
 
-        # if typeof(result) <: Dict
-        #     result["mapCR"] = mapCR_list[i]
-        #     result["model"] = model_list[i]
-        # # TODO: What to do if not dictionary?
-        # end
+        # Some runs have all 0s
 
-        return result
-    end
+        if !all(traj[idx...] .== 0)
 
-    new_keys = collect(zip(mapCR_list, model_list))
-    metrics_dict = Dict(new_keys .=> metrics)
-
-    return metrics_dict
-
-end
-
-
-function compute_metrics(
-    metricfunc::Function,
-    trajDict::Dict,
-    obsDict::Union{Nothing, Dict}=nothing;
-    nparts::Int=6,
-    mapCR_list::Union{Nothing, Vector}=nothing,
-    model_list::Union{Nothing, Vector}=nothing
-)
-
-    # Iterate through quantities of interest
-    metric_tuples = map(keys(trajDict), values(trajDict)) do key, qoi
-
-        obs = isnothing(obsDict) ? nothing : obsDict[key * "Observed"]
-        value = computemetric_onevar(metricfunc, qoi, obs, nparts=nparts,
-                                     mapCR_list=mapCR_list, model_list=model_list)
-
-        return key, value
+            metrics[idx...] = metricfunc(traj[idx...], obs[mapCR=mapCR, model=model];
+                                         kwargs...)
+        else
+            if verbose
+                println("traj is all 0.")
+            end
+        end
 
     end
 
-    metrics_dict = Dict(metric_tuples)
+    # TODO: Apply functions over dim. (i.e. take min over runs)
+    # TODO: Figure out how to restructure result and present it.
 
-    return metrics_dict
-
+    return metrics
 end
 
 
-mapCR = load("output/mapCRList.jld")
-trajDict = load("output/qoi_96runs.jld")
-obsDict = load("output/obs_qoi_96runs.jld")
+# Load data
+traj_array = load("output/qoi_arrays.jld", "traj");
+obs_array = load("output/qoi_arrays.jld", "obs");
+# mapCR_list = load("output/mapCRList.jld", "mapCRList")
+# model_list = vcat(repeat(["AWSoM"], 8), repeat(["AWSoMR"], 8))
 
-mapCR_list = mapCR["mapCRList"]
-model_list = vcat(repeat(["AWSoM"], 8), repeat(["AWSoMR"], 8))
-
+# Remove negative values
 mask(x) = x .> 0
 
 timeshifts = collect(-72:72)
 Tmins = collect(0.1:0.01:0.40)
 Tmaxs = collect(0.60:0.01:0.9)
 dims = 2
-funcs = [mean, minimum, median, maximum, std]
-sortBy=1
 
-metricfunc(traj, obs) = MetricsTools.computeShiftedMaskedRMSE(
-    traj, obs, mask, timeshifts, Tmins, Tmaxs, dims=dims, funcs=funcs,
-    sortBy=sortBy)
-
-metrics = compute_metrics(metricfunc, trajDict, obsDict,
+metrics = compute_metrics(metricfunc, traj_array, obs_array,
                           mapCR_list=mapCR_list,
                           model_list=model_list)
 
-metrics_json = json(metrics)
 
-open("output/shifted_metrics_dict.json", "w") do f
-    write(f, metrics_json)
-end
+save("output/shifted_metrics_array.jld", "metrics", metrics)
 
-save("output/shifted_metrics_dict.jld", metrics)
+
+# TODO: Figure out how to save AxisArray in a presentable way
+
+# metrics_json = json(metrics)
+
+# open("output/shifted_metrics_dict.json", "w") do f
+#     write(f, metrics_json)
+# end
+
+# save("output/shifted_metrics_dict.jld", metrics)

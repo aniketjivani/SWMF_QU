@@ -1,305 +1,220 @@
+"""
+Module consisting of helper functions for computing metrics (namely RMSE) of
+ shifted, trimmed, and/or masked arrays.
+"""
 module MetricsTools
 
 using Missings
-using Statistics: mean, median
+using Statistics: mean, median, minimum
+using ShiftedArrays, AxisArrays
 
-# Masks can either be BitArrays or functions that take vectors
-const MASKTYPE(P) = Union{BitArray{P},Function,Nothing}
 
-# Array that allows missing type
-const MISSINGARRAY(T, P) = Array{Union{Missing,T},P}
-
-@doc raw"""
-    maskArray(x::Array{T,P}, mask::Union{BitArray{P},Function})
-
-Returns array masked by `mask`.
-
-"""
-function maskArray(
-    x::Array{T,P},
-    mask::MASKTYPE(P),
-    # mask::Union{BitArray{P},Function}
-)::MISSINGARRAY(T, P) where {T,P}
-
-    if !(T <: Union{Missing,Any})
-        x = convert(Array{Union{T,Missing},P}, x)
-    end
-
-    if typeof(mask) <: BitArray{P}
-        x_masked = x[mask]
-    else
-        computedMask = mask(x)
-        x_masked = x[computedMask]
-    end
-
-    if P > 1
-        x_masked = reshape(x_masked, :, size(x)[2])
-    end
-
-    return x_masked
+function _get_trim_index(x, trim)
+    return (Int ∘ round)(trim * size(x)[1]) |> (z -> (z == 0) ? 1 : z)
 end
 
-@doc raw"""
-    computeMaskedMetric(x::Vector, y::Vector, mask::MASKTYPE{1}, metric::Function)
+function axesdict(x::AxisArray)
 
-Compute metrics of masked arrays.
+    ax = AxisArrays.axes(x)
 
-Note: Only works for 1 or 2 dim. arrays.
+    ax_names = (collect ∘ zip)(axisnames.(ax)...)[1]
+    ax_values = (x -> x.val).(ax)
 
-"""
-function computeMaskedMetric(
-    # x::Array{Any, P},
-    x::Array,
-    y::Vector,
-    mask::MASKTYPE(1),
-    metric::Function
-)
-
-    computedMask = mask(x) .& mask(y)
-
-    x_masked = maskArray(x, computedMask)
-
-    if ndims(x) == 1
-        y_masked = maskArray(y, computedMask)
-    elseif ndims(x) == 2
-        y_masked = maskArray(
-            repeat(y, inner=(1, size(x)[2])),
-            computedMask)
-    else
-        throw(ErrorException("P must be 1 or 2."))
-    end
-
-    computedMetric = metric(x_masked, y_masked)
-
-    return computedMetric
-end
-
-RMSE(x::Array, obs::Array) = sqrt(mean((x .- obs).^2))
-computeMaskedRMSE(x, y, mask) = computeMaskedMetric(x, y, mask, RMSE)
-
-
-function _get_missing_array(z, timeshift)
-    if ndims(z) > 1
-        missingArray = repeat([missing], timeshift, size(z)[2])
-    else
-        missingArray = repeat([missing], timeshift)
-    end
-
-    return missingArray
+    return Dict(ax_names .=> ax_values)
 end
 
 
-function shift_array(x::Array, y::Array, timeshift::Int)
+_f_missing(f, x, ::Colon, kwargs...) = (f ∘ skipmissing)(x, kwargs...)
 
-    @assert size(x)[1] == size(y)[1] "x, y don't have the same number of rows!"
 
-    # Shift x if timeshift > 0
-    # Shift y if timeshift < 0
-    if timeshift > 0
-        x_shifted = vcat(_get_missing_array(x, timeshift), x)
-        y_shifted = vcat(y, _get_missing_array(y, timeshift))
-
-    else
-        x_shifted = vcat(x, _get_missing_array(x, -timeshift))
-        y_shifted = vcat(_get_missing_array(y, -timeshift), y)
-    end
-
-    return x_shifted, y_shifted
-
+function _f_missing(f, x, dims, kwargs...)
+    eachslice(x, dims=dims) .|> (z -> (f ∘ skipmissing)(z, kwargs...))
 end
 
-function trim_array(x, y, Tmin, Tmax)
 
+f_missing(f, x; dims=:, kwargs...) = _f_missing(f, x, dims, kwargs...)
+f_missing(f) = (f ∘ skipmissing)
 
-    TminIdx = Int(ceil(Tmin * size(x)[1]))
+function _mask_array(x, mask::BitArray)
 
-    if Tmin == 0
-        TminIdx = TminIdx + 1
-    end
+    @assert size(x) == size(mask)
 
-    TmaxIdx = Int(floor(Tmax * size(x)[1]))
+    if any(.!mask)
+        # Initialize array of all missing with same size and eltype as x
+        x_masked = similar([missing], Union{Missing, eltype(x)}, size(x)...)
 
-    if ndims(x) > 1
-        xTrimmed = x[TminIdx:TmaxIdx,:]
+        # If mask[i,j] = 1, x_masked[i, j] = x[i, j].
+        # Otherwise, x_masked[i, j] = missing
+        x_masked[mask] .= x[mask]
+
+        return x_masked
     else
-        xTrimmed = x[TminIdx:TmaxIdx]
+        # Do nothing if mask is all 1
+        return x
     end
-
-    if ndims(y) > 1
-        yTrimmed = y[TminIdx:TmaxIdx,:]
-    else
-        yTrimmed = y[TminIdx:TmaxIdx]
-    end
-
-    return xTrimmed, yTrimmed
-
 end
 
-function shift_trim_array(x, y, timeshift, Tmin, Tmax)
+mask_array(x, mask::BitArray) = _mask_array(x, mask)
+mask_array(x, mask::Function) = _mask_array(x, mask(x))
+mask_array(x, ::Nothing) = x
 
-    x_shifted, y_shifted = shift_array(x, y, timeshift)
-    x_trimmed, y_trimmed = trim_array(x_shifted, y_shifted, Tmin, Tmax)
 
-    return x_trimmed, y_trimmed
+function trim_array(x, Tmin, Tmax; dim=1)
 
+    @assert Tmin >= 0 "Tmin must be >= 0."
+    @assert Tmax <= 1 "Tmax must be <= 1."
+    @assert Tmin <= Tmax "Tmin should be <= Tmax."
+
+    Tmin_idx = _get_trim_index(x, Tmin)
+    Tmax_idx = _get_trim_index(x, Tmax)
+
+    return selectdim(x, dim, Tmin_idx:Tmax_idx)
 end
 
-"""
-    function shiftedRMSE(x::Array, y::Array, timeshift::Int,
-                        Tmin::Int, Tmax::Int, shiftx::Bool=true)
 
-Shift x,y using shiftArray and compute RMSE on non-missing indices.
+mean_missing(x; dims=:) = f_missing(mean, x, dims=dims)
+# Can add any other function analogously
 
-"""
-function shiftedRMSE(
-    x::Array,
-    y::Array,
-    timeshift::Int,
-    Tmin::Float64,
-    Tmax::Float64;
-    shiftx::Bool=true,
-    square::Bool=false,
-    dims::Union{Nothing,Int}=nothing
-)
+_mse_missing(x, y; dims=:) = mean_missing((x .- y).^2, dims=dims)
 
-    xShifted, yShifted = shift_trim_array(x, y, timeshift, Tmin, Tmax)
 
-    sqDiff = (xShifted .- yShifted).^2
-    rmse = meanNA(sqDiff, dims=dims)
+function _rmse_missing(x, y; dims=2, square=false)
+    if square
+        return _mse_missing(x, y, dims=dims)
+    else
+        return _mse_missing(x, y, dims=dims) .|> sqrt
+    end
+end
 
-    if !square
-        rmse = sqrt.(rmse)
+
+
+function rmse_shifted(x, y, shift; kwargs...)
+    return _rmse_missing(lag(x, shift), y; kwargs...)
+end
+
+
+function rmse_trimmed(x, y, Tmin, Tmax; kwargs...)
+    x_trimmed, y_trimmed = trim_array.((x, y), Tmin, Tmax)
+    rmse = _rmse_missing(x_trimmed, y_trimmed; kwargs...)
+
+    return rmse
+end
+
+
+# NOTE: kwargs contain dims, square
+function rmse_shifted_trimmed(x, y, shift, Tmin, Tmax;
+                              trim_first=false, kwargs...)
+
+    if trim_first
+        x_trimmed, y_trimmed = trim_arrays.((x, y), Tmin, Tmax)
+        rmse = rmse_shifted(x_trimmed, y_trimmed,
+                            dims=dims, square=square)
+    else
+        rmse = rmse_trimmed(lag(x, shift), y, Tmin, Tmax; kwargs...)
     end
 
     return rmse
 end
 
 
-@doc raw"""
-    function computeShiftedRMSE(x::Array, y::Array, timeshifts::Vector{Int},
-                                Tmins::Vector{Int}, Tmaxs::Vector{Int},
-                                shiftx::Bool=true, RMSEonly::Bool=false)
+function rmse(x, y; shift::Integer, Tmin::Number, Tmax::Number,
+              mask, copy=true, trim_first=false, dims=2, square=false)
 
-Computes min{timeshift, Tmin, Tmax} shiftedRMSE(timeshift, Tmin, Tmax) over
-the grid timeshifts x Tmins x Tmaxs.
-
-If RMSEonly, return the minimum RMSE. Otherwise, return a dictionary with
-the best parameters and RMSE.
-
-"""
-function computeShiftedRMSE(x::Array, y::Array,
-                            timeshifts::Vector,
-                            Tmins::Vector{Float64},
-                            Tmaxs::Vector{Float64};
-                            shiftx::Bool=true,
-                            RMSEonly::Bool=false,
-                            dims::Union{Nothing,Int}=nothing,
-                            funcs::Vector=[median],
-                            sortBy::Int=1,
-                            verbose::Bool=false)
-
-    # TODO: Modify to allow different functions of the RMSE vector if dims > 1
-
-    RMSEisVector = !ismissing(dims) && ndims(x) > 1
-
-    # Initialize array to store RMSEs
-    if RMSEisVector
-        res = allowmissing(
-            zeros(size(timeshifts)[1],
-                  size(Tmins)[1],
-                  size(Tmaxs)[1],
-                  length(funcs)))
+    # Mask x, y
+    if copy
+        x_ = mask_array(x, mask)
+        y_ = mask_array(y, mask)
     else
-        res = allowmissing(
-            zeros(size(timeshifts)[1],
-                  size(Tmins)[1],
-                  size(Tmaxs)[1]))
+        x_ = x
+        y_ = y
+        mask_array!(x, mask)
+        mask_array!(y, mask)
     end
 
-    # Gridsearch
-    for (i, timeshift) in enumerate(timeshifts)
-        for (j, Tmin) in enumerate(Tmins)
-            for (k, Tmax) in enumerate(Tmaxs)
-
-                rmse = shiftedRMSE(x, y, timeshift, Tmin, Tmax,
-                                   shiftx=shiftx, dims=dims)
-                if RMSEisVector
-                    res[i,j,k,:] = map((f) -> f(rmse), funcs)
-                else
-                    res[i,j,k] = rmse
-                end
-
-                if verbose
-                    println("RMSE for timeshift=$timeshift, Tmin=$Tmin, Tmax=$Tmax: $(res[i,j,k])")
-                end
-
-            end
-        end
-    end
-
-    @assert !all(ismissing.(res)) "RMSE's are all missing!"
-
-    if RMSEisVector
-        bestIdx = argmin(skipmissing(res[:,:,:,sortBy]))
-        sortedres = res[bestIdx,:]
-    else
-        bestIdx = argmin(skipmissing(res))
-        sortedres = res[bestIdx]
-    end
-
-    if RMSEonly
-        # Only return the minimum RMSE
-        return minimum(skipmissing(sortedres))
-    else
-        # Return a dictionary with the best parameters and RMSE
-
-        bestTimeshift = length(timeshifts) == 1 ? 1 : timeshifts[bestIdx[1]]
-        bestTmin = length(Tmins) == 1 ? 1 : Tmins[bestIdx[2]]
-        bestTmax = length(Tmaxs) == 1 ? 1 : Tmaxs[bestIdx[3]]
-
-        funcNames = String.(Symbol.(funcs))
-        RMSEdict = Dict(funcNames .=> sortedres)
-
-        resDict = Dict(
-            "RMSE" => sortedres[sortBy],
-            "RMSEdict" => RMSEdict,
-            "timeshift" => bestTimeshift,
-            "Tmin" => bestTmin,
-            "Tmax" => bestTmax
-        )
-
-        return resDict
-    end
+    return rmse_shifted_trimmed(x_, y_, shift, Tmin, Tmax,
+                                trim_first=trim_first, dims=dims, square=square)
 
 end
 
-function computeShiftedMaskedRMSE(x, y, mask, timeshifts, Tmins, Tmaxs;
-                                  shiftx=true,
-                                  dims=nothing,
-                                  funcs=[mean],
-                                  sortBy=1,
-                                  RMSEonly=false,
-                                  verbose=false)
+# NOTE: This commented section tried to implement RMSE functions that apply a
+# function to an array of RMSEs.
+# This is not relevant to the current framework because we want to apply to
+# functions to the overall RMSE array in compute_metrics. This might be useful
+# in the future so I keep it commented here.
 
-    rmse = computeMaskedMetric(
-        x, y, mask,
-        (x, y) -> computeShiftedRMSE(x, y, timeshifts, Tmins, Tmaxs,
-                                     shiftx=shiftx,
-                                     dims=dims,
-                                     funcs=funcs,
-                                     sortBy=sortBy,
-                                     RMSEonly=RMSEonly,
-                                     verbose=verbose)
-    )
+# # NOTE: kwargs contain trim_first, dims, square
+# function __rmse(x, y, shift::Integer, Tmin::Number, Tmax::Number;
+#                 mask, copy, kwargs...)
 
-    return rmse
+#     # Mask x, y
+#     if copy
+#         x_ = mask_array(x, mask)
+#         y_ = mask_array(y, mask)
+#     else
+#         x_ = x
+#         y_ = y
+#         mask_array!(x, mask)
+#         mask_array!(y, mask)
+#     end
 
-end
+#     return rmse_shifted_trimmed(x_, y_, shift, Tmin, Tmax; kwargs...)
+
+# end
 
 
-export maskArray,
-    computeMaskedMetric,
-    computeMaskedRMSE,
-    computeShiftedRMSE
+# # NOTE: kwargs contain trim_first, dims, square, mask, copy for _rmse
+# # Apply function to one of the axes
+# function _rmse(x, y, func::Function, func_dim::Integer, shift, Tmin, Tmax;
+#                kwargs...)
+
+#     rmse_array = __rmse(x, y, shift, Tmin, Tmax; kwargs...)
+
+#     # NOTE: func needs to have keyword argument dims
+#     # e.g. minimum, mean, etc
+#     # Tried mapslices but it gave an error
+
+#     func_rmse = func(rmse_array, dims=func_dim)
+
+#     return dropdims(func_rmse, dims=func_dim)
+
+# end
+
+# function _rmse(x, y, func::Function, func_dim::Symbol,
+#                shift, Tmin, Tmax; kwargs...)
+
+#     rmse_array = __rmse(x, y, shift, Tmin, Tmax; kwargs...)
+
+#     # NOTE: func needs to have keyword argument dims
+#     # e.g. minimum, mean, etc
+#     # Tried mapslices but it gave an error
+
+#     ax_dim = axisdim(rmse_array, Axis{func_dim})
+#     func_rmse = func(rmse_array, dims=ax_dim)
+
+#     return dropdims(func_rmse, dims=ax_dim)
+# end
+
+# function _rmse(x, y, ::Nothing, func_dim, shift, Tmin, Tmax; kwargs...)
+#     return __rmse(x, y, shift, Tmin, Tmax; kwargs...)
+# end
+
+
+# function rmse(x, y; func=nothing, func_dim=1,
+#               shift, Tmin, Tmax, mask=nothing, dims=2, square=false,
+#               copy=true, trim_first=false)
+
+#     return _rmse(x, y, func, func_dim, shift, Tmin, Tmax;
+#                  mask=mask, dims=dims, square=square, copy=copy,
+#                  trim_first=trim_first)
+# end
+
+
+
+export mean_missing,
+    _rmse_missing,
+    rmse_shifted_trimmed,
+    mask_array!,
+    rmse_masked,
+    compute_metrics
 
 end
