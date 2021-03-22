@@ -4,14 +4,28 @@ using JLD, Statistics, IterTools, DataFrames, JSON, AxisArrays, CSV
 include("metricsTools.jl")
 
 
+@doc raw"""
+    compute_metrics(metricfunc::Function,
+                         traj::AxisArray,
+                         obs::AxisArray[,
+                         verbose=false,
+                         kwargs...])
+
+Main function for computing metrics on trajectories and observations.
+
+# Arguments
+- `metricfunc::Function`: function that takes 2 arrays and computes a metric
+- `traj::AxisArray`: Multi-dimensional array containing simulation trajectories
+- `obs::AxisArray`: Multi-dimensional array containing observed trajectories
+- `verbose::Bool`: Print status statements
+- `kwargs...`: Keyword arguments to pass into metricfunc
+
+"""
 function compute_metrics(metricfunc::Function,
                          traj::AxisArray,
-                         obs::AxisArray;
+                         obs::AxisArray,
                          verbose=false,
                          kwargs...)
-    # Computes an array where each element is the metric value for
-    # a specific mapCR, model, and run
-
     # NOTE: I use AxisArrays here because they are easy to manipulate and index.
 
     ## Get mapCR and model list
@@ -65,6 +79,16 @@ function compute_metrics(metricfunc::Function,
 end
 
 
+@doc raw"""
+    min_metrics_table(metrics[; dims=:run])
+
+Make table of the minimum metrics over dims from a metrics array.
+
+# Arguments
+- `metrics`: Array from compute_metrics.
+- `dims=:run`: Dimension to compute minimum over
+
+"""
 function min_metrics_table(metrics; dims=:run)
 
     # Get minimum rmse array
@@ -85,6 +109,17 @@ function min_metrics_table(metrics; dims=:run)
     return df
 end
 
+@doc raw"""
+    min_params_table(metrics, params[; dims=:run])
+
+Make table of the parameters that minimize metrics over dims.
+
+# Arguments
+- `metrics`: Array from compute_metrics.
+- `params`: Params array from compute_metrics.
+- `dims=:run`: Dimension to compute minimum over
+
+"""
 function min_params_table(metrics, params; dims=:run)
 
     ax_dim = axisdim(metrics, Axis{dims})
@@ -110,12 +145,43 @@ function min_params_table(metrics, params; dims=:run)
     return hcat(idx_df, param_df)
 end
 
+@doc raw"""
+    save_results(traj_array, obs_array[;
+                      metric=MetricsTools.rmse,
+                      mask=(x -> x .>= 0),
+                      timeshifts=collect(-72:72),
+                      Tmins=[0.2], Tmaxs=[0.8],
+                      save_path="output/metrics_table.csv",
+                      verbose=false,
+                      kwargs...])
+
+Save results.
+
+By default, this saves a table to save_path with the columns
+qoi, model, mapCR, value, shift, Tmin, Tmax.
+
+# Arguments
+- `traj_array`: Array containing simulation trajectories
+- `obs_array`: Array containing observed trajectories
+- `metric=MetricsTools.rmse`: Function that computes metric between 2 arrays
+- `mask`: Function to compute mask. By default, this is a function that subsets
+          the non-negative values. This is used to filter out the really large
+          negative values in some of the observed trajectories.
+- `timeshifts=collect(-72:72)`: Array of timeshifts to minimize metric over.
+- `Tmins=[0.2]`: Array of Tmins to minimize metric over.
+                 e.g. 0.2 means we trim the first 20% time points
+- `Tmaxs=[0.8]`: Array of Tmaxs to minimize metric over.
+- `save_path="output/metrics_table.csv"`: Path to save results table to
+- `verbose=false`: Print status statements
+- `kwargs...`: Keyword arguments for metric
+
+```
+"""
 function save_results(traj_array, obs_array;
                       metric=MetricsTools.rmse,
                       mask=(x -> x .>= 0),
                       timeshifts=collect(-72:72),
-                      Tmins=[0.2],
-                      Tmaxs=[0.8],
+                      Tmins=[0.2], Tmaxs=[0.8],
                       save_path="output/metrics_table.csv",
                       verbose=false,
                       kwargs...)
@@ -123,7 +189,7 @@ function save_results(traj_array, obs_array;
     println("Computing metrics...")
     metrics, params = compute_metrics(
         metric, traj_array, obs_array; shift=timeshifts, Tmin=Tmins, Tmax=Tmaxs,
-        mask=mask, verbose=verbose)
+        mask=mask, verbose=verbose, kwargs...)
 
     println("Converting to tables...")
     min_metrics_df = min_metrics_table(metrics, dims=:run)

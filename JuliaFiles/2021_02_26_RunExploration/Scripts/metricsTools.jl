@@ -1,5 +1,5 @@
 """
-Module consisting of helper functions for computing metrics (namely RMSE) of
+Module consisting of functions for computing metrics (namely RMSE) of
  shifted, trimmed, and/or masked arrays.
 """
 module MetricsTools
@@ -8,19 +8,11 @@ using Missings
 using Statistics: mean, median, minimum
 using ShiftedArrays, AxisArrays
 
+# Functions starting with _ are helper functions mainly used in other functions
+# Just ignore these.
 
 function _get_trim_index(x, trim)
     return (Int ∘ round)(trim * size(x)[1]) |> (z -> (z == 0) ? 1 : z)
-end
-
-function axesdict(x::AxisArray)
-
-    ax = AxisArrays.axes(x)
-
-    ax_names = (collect ∘ zip)(axisnames.(ax)...)[1]
-    ax_values = (x -> x.val).(ax)
-
-    return Dict(ax_names .=> ax_values)
 end
 
 
@@ -30,10 +22,6 @@ _f_missing(f, x, ::Colon, kwargs...) = (f ∘ skipmissing)(x, kwargs...)
 function _f_missing(f, x, dims, kwargs...)
     eachslice(x, dims=dims) .|> (z -> (f ∘ skipmissing)(z, kwargs...))
 end
-
-
-f_missing(f, x; dims=:, kwargs...) = _f_missing(f, x, dims, kwargs...)
-f_missing(f) = (f ∘ skipmissing)
 
 function _mask_array(x, mask::BitArray)
 
@@ -54,26 +42,6 @@ function _mask_array(x, mask::BitArray)
     end
 end
 
-mask_array(x, mask::BitArray) = _mask_array(x, mask)
-mask_array(x, mask::Function) = _mask_array(x, mask(x))
-mask_array(x, ::Nothing) = x
-
-
-function trim_array(x, Tmin, Tmax; dim=1)
-
-    @assert Tmin >= 0 "Tmin must be >= 0."
-    @assert Tmax <= 1 "Tmax must be <= 1."
-    @assert Tmin <= Tmax "Tmin should be <= Tmax."
-
-    Tmin_idx = _get_trim_index(x, Tmin)
-    Tmax_idx = _get_trim_index(x, Tmax)
-
-    return selectdim(x, dim, Tmin_idx:Tmax_idx)
-end
-
-
-mean_missing(x; dims=:) = f_missing(mean, x, dims=dims)
-# Can add any other function analogously
 
 _mse_missing(x, y; dims=:) = mean_missing((x .- y).^2, dims=dims)
 
@@ -87,33 +55,9 @@ function _rmse_missing(x, y; dims=2, square=false)
 end
 
 
-
+# Compute RMSE after shifting x
 function rmse_shifted(x, y, shift; kwargs...)
     return _rmse_missing(lag(x, shift), y; kwargs...)
-end
-
-
-function rmse_trimmed(x, y, Tmin, Tmax; kwargs...)
-    x_trimmed, y_trimmed = trim_array.((x, y), Tmin, Tmax)
-    rmse = _rmse_missing(x_trimmed, y_trimmed; kwargs...)
-
-    return rmse
-end
-
-
-# NOTE: kwargs contain dims, square
-function rmse_shifted_trimmed(x, y, shift, Tmin, Tmax;
-                              trim_first=false, kwargs...)
-
-    if trim_first
-        x_trimmed, y_trimmed = trim_arrays.((x, y), Tmin, Tmax)
-        rmse = rmse_shifted(x_trimmed, y_trimmed,
-                            dims=dims, square=square)
-    else
-        rmse = rmse_trimmed(lag(x, shift), y, Tmin, Tmax; kwargs...)
-    end
-
-    return rmse
 end
 
 
@@ -171,6 +115,86 @@ function _rmse(x, y, shift::Vector, Tmin::Vector, Tmax::Vector; kwargs...)
 
 end
 
+#############################################################################
+
+function axesdict(x::AxisArray)
+    # Get dictionary with axis name, values as key, value
+
+    ax = AxisArrays.axes(x)
+
+    ax_names = (collect ∘ zip)(axisnames.(ax)...)[1]
+    ax_values = (x -> x.val).(ax)
+
+    return Dict(ax_names .=> ax_values)
+end
+
+# Compute f while ignoring missing values
+f_missing(f, x; dims=:, kwargs...) = _f_missing(f, x, dims, kwargs...)
+f_missing(f) = (f ∘ skipmissing)
+
+# Compute mean, ignoring missing
+mean_missing(x; dims=:) = f_missing(mean, x, dims=dims)
+# Can add any other function analogously
+
+# Mask array when mask is either a function or BitArray
+mask_array(x, mask::BitArray) = _mask_array(x, mask)
+mask_array(x, mask::Function) = _mask_array(x, mask(x))
+mask_array(x, ::Nothing) = x
+
+@doc raw"""
+    trim_array(x, Tmin, Tmax[; dim=1])
+
+Trim array.
+
+# Arguments
+- `x`: Array to trim
+- `Tmin`: Percentage to trim from the beginning of x
+- `Tmax`: Percentage to trim from the end of x
+- `dim=1`: Dimension to trim over. Default is to trim by rows.
+
+```
+"""
+function trim_array(x, Tmin, Tmax; dim=1)
+
+    @assert Tmin >= 0 "Tmin must be >= 0."
+    @assert Tmax <= 1 "Tmax must be <= 1."
+    @assert Tmin <= Tmax "Tmin should be <= Tmax."
+
+    Tmin_idx = _get_trim_index(x, Tmin)
+    Tmax_idx = _get_trim_index(x, Tmax)
+
+    return selectdim(x, dim, Tmin_idx:Tmax_idx)
+end
+
+
+# Compute RMSE after trimming x, y by Tmin, Tmax
+function rmse_trimmed(x, y, Tmin, Tmax; kwargs...)
+    x_trimmed, y_trimmed = trim_array.((x, y), Tmin, Tmax)
+    rmse = _rmse_missing(x_trimmed, y_trimmed; kwargs...)
+
+    return rmse
+end
+
+
+# NOTE: kwargs contain dims, square
+function rmse_shifted_trimmed(x, y, shift, Tmin, Tmax;
+                              trim_first=false, kwargs...)
+
+    if trim_first
+        # Trim before shifting
+        x_trimmed, y_trimmed = trim_arrays.((x, y), Tmin, Tmax)
+        rmse = rmse_shifted(x_trimmed, y_trimmed,
+                            dims=dims, square=square)
+    else
+        # Shift before trimming
+        rmse = rmse_trimmed(lag(x, shift), y, Tmin, Tmax; kwargs...)
+    end
+
+    return rmse
+end
+
+
+# Compute RMSE with options to shift, trim, and mask x, y
 function rmse(x, y; shift=0, Tmin=0.0, Tmax=1.0, mask=nothing, square=false,
               copy=true, dims=2)
     return _rmse(x, y, shift, Tmin, Tmax, mask=mask, square=square, copy=copy,
