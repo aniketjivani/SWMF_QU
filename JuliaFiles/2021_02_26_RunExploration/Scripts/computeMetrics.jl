@@ -1,4 +1,4 @@
-using JLD, Statistics, IterTools, DataFrames, JSON, AxisArrays
+using JLD, Statistics, IterTools, DataFrames, JSON, AxisArrays, CSV
 # using CSV
 
 include("metricsTools.jl")
@@ -11,6 +11,8 @@ function compute_metrics(metricfunc::Function,
                          kwargs...)
     # Computes an array where each element is the metric value for
     # a specific mapCR, model, and run
+
+    # NOTE: I use AxisArrays here because they are easy to manipulate and index.
 
     ## Get mapCR and model list
     mapCRs = AxisArrays.axes(traj)[3]
@@ -62,30 +64,77 @@ function compute_metrics(metricfunc::Function,
     return metrics, params
 end
 
-function min_metrics(metrics, params, dims=:run)
-    ax_dims = axisdim(metrics, Axis{dims})
-    min_metrics = minimum(metrics, dims=ax_dims)
 
-    return dropdims(min_metrics, dims=ax_dim)
+function min_metrics_table(metrics; dims=:run)
+
+    # Get minimum rmse array
+    ax_dims = axisdim(metrics, Axis{dims})
+    min_metrics = minimum(metrics, dims=ax_dims) |>
+        (z -> dropdims(z, dims=ax_dims))
+
+    # Get indices in the correct format
+    axes_tuple = map((x -> x.val), min_metrics.axes)
+    indices_names = (collect ∘ zip)(axisnames.(min_metrics.axes)...)[1]
+
+    # Create dataframe
+    df = (collect ∘ product)(axes_tuple...)[:] .|>
+        NamedTuple{indices_names} |>
+        DataFrame
+    df[:value] = min_metrics[:]
+
+    return df
 end
 
-function min_params(metrics, params, dims=:run)
+function min_params_table(metrics, params; dims=:run)
 
     ax_dim = axisdim(metrics, Axis{dims})
     qoi_dim = axisdim(metrics, Axis{:qoi})
     dims_ = (ax_dim, qoi_dim)
 
-    min_idx = argmin(metrics.data, dims=dims_) |> (z -> dropdims(z, dims=dims_))
+    min_idx = argmin(metrics.data, dims=dims_) |>
+        (z -> dropdims(z, dims=dims_))
 
     # Drop last index in CartesianIndex
     min_idx_params = [CartesianIndex(idx.I[1:end-1]) for idx in min_idx[:]]
 
-    min_params = AxisArray(reshape(params[min_idx_params], size(min_idx)),
-                            AxisArrays.axes(params)[2:end])
+    min_params_axes = params.axes[2:end]
+    axes_tuple = map((x -> x.val), min_params_axes)
+    idx_names = (collect ∘ zip)(axisnames.(min_params_axes)...)[1]
 
-    # TODO: Make the result a dataframe instead.
+    idx_df = (collect ∘ product)(axes_tuple...)[:] .|>
+        NamedTuple{idx_names} |>
+        DataFrame
 
-    return min_params
+    param_df = DataFrame(params[min_idx_params][:])
+
+    return hcat(idx_df, param_df)
+end
+
+function save_results(traj_array, obs_array;
+                      metric=MetricsTools.rmse,
+                      mask=(x -> x .>= 0),
+                      timeshifts=collect(-72:72),
+                      Tmins=[0.2],
+                      Tmaxs=[0.8],
+                      save_path="output/metrics_table.csv",
+                      verbose=false,
+                      kwargs...)
+
+    println("Computing metrics...")
+    metrics, params = compute_metrics(
+        metric, traj_array, obs_array; shift=timeshifts, Tmin=Tmins, Tmax=Tmaxs,
+        mask=mask, verbose=verbose)
+
+    println("Converting to tables...")
+    min_metrics_df = min_metrics_table(metrics, dims=:run)
+    params_df = min_params_table(metrics, params, dims=:run)
+
+    # Join dataframes on mapCR, model
+    println("Joining tables...")
+    df = innerjoin(min_metrics_df, params_df, on = [:mapCR, :model])
+
+    println("Saving joined table...")
+    CSV.write(save_path, df)
 end
 
 
@@ -93,31 +142,17 @@ end
 traj_array = load("output/qoi_arrays.jld", "traj");
 obs_array = load("output/qoi_arrays.jld", "obs");
 
-# mapCR_list = load("output/mapCRList.jld", "mapCRList")
-# model_list = vcat(repeat(["AWSoM"], 8), repeat(["AWSoMR"], 8))
-# # Don't need to load these anymore because they are in the axes
+metric = MetricTools.rmse
+save_path = "output/metrics_tables.csv"
 
 # Remove negative values
 mask(x) = x .>= 0
 
 # Parameters to optimize over
 timeshifts = collect(-72:72)
-Tmins = collect(0.1:0.01:0.40)
-Tmaxs = collect(0.60:0.01:0.9)
-dims = 2
+Tmins = [.2]
+Tmaxs = [.8]
 
-metrics, params = compute_metrics(metricfunc, traj_array, obs_array,)
-
-
-save("output/shifted_metrics_array.jld", "metrics", metrics)
-
-
-# TODO: Figure out how to save AxisArray in a presentable way
-
-# metrics_json = json(metrics)
-
-# open("output/shifted_metrics_dict.json", "w") do f
-#     write(f, metrics_json)
-# end
-
-# save("output/shifted_metrics_dict.jld", metrics)
+save_results(traj_array, obs_array, metric=metric, mask=mask,
+             timeshifts=timeshifts, Tmins=Tmins, Tmaxs=Tmaxs,
+             save_path=save_path)
