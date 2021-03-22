@@ -146,14 +146,22 @@ function _rmse(x, y, shift::Vector, Tmin::Vector, Tmax::Vector; kwargs...)
 
     n_shift, n_Tmin, n_Tmax = length.((shift, Tmin, Tmax))
 
+    @assert size(x) == size(y)
+
+    qoi_dim = axisdim(x, Axis{:qoi})
+    n_qoi = size(x)[qoi_dim]
+
     # Initialize array to store results
-    res = zeros(n_shift, n_Tmin, n_Tmax)
+    res = zeros(n_shift, n_Tmin, n_Tmax, n_qoi)
 
     for i = 1:n_shift, j = 1:n_Tmin, k = 1:n_Tmax
-        res[i,j,k] = __rmse(x, y, shift[i], Tmin[j], Tmax[k]; kwargs...)
+        res[i,j,k,:] = __rmse(x, y, shift[i], Tmin[j], Tmax[k]; kwargs...)
     end
 
-    min_rmse, min_idx = findmin(skipmissing(res))
+    # Take min of the mean over QOIs
+
+    min_idx = mean(res, dims=4) |> argmin |> (x -> x.I[1:end-1])
+    min_rmse = res[min_idx...,:]
 
     best_params = (shift=shift[min_idx[1]],
                    Tmin=Tmin[min_idx[2]],
