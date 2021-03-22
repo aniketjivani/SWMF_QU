@@ -117,8 +117,8 @@ function rmse_shifted_trimmed(x, y, shift, Tmin, Tmax;
 end
 
 
-function rmse(x, y; shift::Integer, Tmin::Number, Tmax::Number,
-              mask, copy=true, trim_first=false, dims=2, square=false)
+function __rmse(x, y, shift::Integer, Tmin::Number, Tmax::Number;
+                mask, copy, kwargs...)
 
     # Mask x, y
     if copy
@@ -131,10 +131,44 @@ function rmse(x, y; shift::Integer, Tmin::Number, Tmax::Number,
         mask_array!(y, mask)
     end
 
-    return rmse_shifted_trimmed(x_, y_, shift, Tmin, Tmax,
-                                trim_first=trim_first, dims=dims, square=square)
+    return rmse_shifted_trimmed(x_, y_, shift, Tmin, Tmax; kwargs...)
+end
+
+# NOTE: kwargs contain dims, square, mask, copy
+function _rmse(x, y, shift::Integer, Tmin::AbstractFloat, Tmax::AbstractFloat;
+               kwargs...)
+
+    rmse = __rmse(x, y, shift, Tmin, Tmax; kwargs...)
+    return rmse, (shift=shift, Tmin=Tmin, Tmax=Tmax)
+end
+
+function _rmse(x, y, shift::Vector, Tmin::Vector, Tmax::Vector; kwargs...)
+
+    n_shift, n_Tmin, n_Tmax = length.((shift, Tmin, Tmax))
+
+    # Initialize array to store results
+    res = zeros(n_shift, n_Tmin, n_Tmax)
+
+    for i = 1:n_shift, j = 1:n_Tmin, k = 1:n_Tmax
+        res[i,j,k] = __rmse(x, y, shift[i], Tmin[j], Tmax[k]; kwargs...)
+    end
+
+    min_rmse, min_idx = findmin(skipmissing(res))
+
+    best_params = (shift=shift[min_idx[1]],
+                   Tmin=Tmin[min_idx[2]],
+                   Tmax=Tmax[min_idx[3]])
+
+    return min_rmse, best_params
 
 end
+
+function rmse(x, y; shift=0, Tmin=0.0, Tmax=1.0, mask=nothing, square=false,
+              copy=true, dims=2)
+    return _rmse(x, y, shift, Tmin, Tmax, mask=mask, square=square, copy=copy,
+                 dims=dims)
+end
+
 
 # NOTE: This commented section tried to implement RMSE functions that apply a
 # function to an array of RMSEs.
