@@ -1,5 +1,5 @@
-using JLD, Statistics, IterTools, DataFrames, JSON, AxisArrays, CSV
-# using CSV
+using JLD, Statistics, IterTools, DataFrames, JSON, AxisArrays, CSV, StatsBase
+
 
 include("metricsTools.jl")
 
@@ -23,7 +23,7 @@ Main function for computing metrics on trajectories and observations.
 """
 function compute_metrics(metricfunc::Function,
                          traj::AxisArray,
-                         obs::AxisArray,
+                         obs::AxisArray;
                          verbose=false,
                          kwargs...)
     # NOTE: I use AxisArrays here because they are easy to manipulate and index.
@@ -76,6 +76,29 @@ function compute_metrics(metricfunc::Function,
     end
 
     return metrics, params
+end
+
+function make_table(array)
+
+    axes_tuple = map((x -> x.val), array.axes)
+    indices_names = (collect ∘ zip)(axisnames.(array.axes)...)[1]
+
+    df = (collect ∘ product)(axes_tuple...)[:] .|>
+        NamedTuple{indices_names} |>
+        DataFrame
+
+    df[:value] = array[:]
+
+    return df
+end
+
+function make_params_table(params)
+
+    df = make_table(params) |> dropmissing |>
+        (df -> hcat(df, DataFrame(df[:value])))
+    select!(df, Not(:value))
+    return df
+
 end
 
 
@@ -188,16 +211,23 @@ function save_results(traj_array, obs_array;
 
     println("Computing metrics...")
     metrics, params = compute_metrics(
-        metric, traj_array, obs_array; shift=timeshifts, Tmin=Tmins, Tmax=Tmaxs,
-        mask=mask, verbose=verbose, kwargs...)
+        metric, traj_array, obs_array, verbose=verbose;
+        shift=timeshifts, Tmin=Tmins, Tmax=Tmaxs,
+        mask=mask, kwargs...)
 
     println("Converting to tables...")
-    min_metrics_df = min_metrics_table(metrics, dims=:run)
-    params_df = min_params_table(metrics, params, dims=:run)
+    metrics_df = make_table(metrics)
+    rename!(metrics_df, :value=>"metric")
+    params_df = make_params_table(params)
+
+    # min_metrics_df = min_metrics_table(metrics, dims=:run)
+    # params_df = min_params_table(metrics, params, dims=:run)
 
     # Join dataframes on mapCR, model
     println("Joining tables...")
-    df = innerjoin(min_metrics_df, params_df, on = [:mapCR, :model])
+    df = join(metrics_df, params_df, on = [:mapCR, :model, :run],
+              kind = :inner)
+    select!(df, [:qoi, :mapCR, :model, :run, :metric, :shift, :Tmin, :Tmax])
 
     println("Saving joined table...")
     CSV.write(save_path, df)
@@ -208,17 +238,41 @@ end
 traj_array = load("output/qoi_arrays.jld", "traj");
 obs_array = load("output/qoi_arrays.jld", "obs");
 
-metric = MetricTools.rmse
-save_path = "output/metrics_tables.csv"
+metric = MetricsTools.rmse
+penalty = MetricsTools.timeshift_penalty
+# save_path = "output/metrics_tables.csv"
 
 # Remove negative values
 mask(x) = x .>= 0
 
 # Parameters to optimize over
-timeshifts = collect(-72:72)
+timeshifts = collect(-48:48)
 Tmins = [.2]
 Tmaxs = [.8]
+penalty_kwargs = Dict{Symbol, Any}(
+    :dims=>1,
+    :max_shift=>maximum(abs.(timeshifts)),
+    # :var_measure=>mad_array,
+    # :lambda=>0.2,
+)
 
-save_results(traj_array, obs_array, metric=metric, mask=mask,
-             timeshifts=timeshifts, Tmins=Tmins, Tmaxs=Tmaxs,
-             save_path=save_path)
+MADsq(x; dims=1, kwargs...) = mad.(eachslice(transpose(x), dims=dims); kwargs...).^2
+IQRsq(x; dims=1, kwargs...) = iqr.(eachslice(transpose(x), dims=dims); kwargs...).^2
+
+var_measures = [MetricsTools.mean_max_distance, var, MADsq, IQRsq]
+for measure in var_measures
+    measure_name = String(Symbol(measure))
+    println("Computing metrics with penalty " * measure_name * "...")
+    penalty_kwargs[:var_measure] = measure
+    save_path = "output/metrics_tables_" * measure_name * ".csv"
+
+    if !isfile(save_path)
+        save_results(traj_array, obs_array, metric=metric, mask=mask, timeshifts=timeshifts,
+                     Tmins=Tmins, Tmaxs=Tmaxs, save_path=save_path, normalize=false,
+                     penaltyfunc=penalty, penalize_x=true, penalty_kwargs=penalty_kwargs)
+    else
+        println(save_path * " already exists.")
+    end
+end
+
+

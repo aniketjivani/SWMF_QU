@@ -45,24 +45,83 @@ end
 
 _mse_missing(x, y; dims=:) = mean_missing((x .- y).^2, dims=dims)
 
+# NOTE: Modify this function to change how RMSE is calculated
+# NOTE: kwargs for all other rmse functions are passed here.
+function _rmse_missing(x, y; dims=2, square=false, normalize=false, kwargs...)
+    # penalty should be either nothing or a function
+    # kwargs are keyword arguments for penalty
 
-function _rmse_missing(x, y; dims=2, square=false)
-    if square
-        return _mse_missing(x, y, dims=dims)
+    mse_ = _mse_missing(x, y, dims=dims)
+    
+    # FIXME: Normalize gives error
+    if normalize
+        # FIXME: dims for _f_missing and mean are different
+        mean_dims = (dims ==1) ? 2 : 1
+        mse = mse_ / mean(x, dims=mean_dims)
     else
-        return _mse_missing(x, y, dims=dims) .|> sqrt
+        mse = mse_
+    end
+
+    if square
+        return mse
+    else
+        return sqrt.(mse)
+    end
+
+end
+
+
+# # Compute RMSE after shifting x
+# function _rmse_shifted(x, y, shift; kwargs...)
+#     return _rmse_missing(lag(x, shift), y; kwargs...)
+# end
+
+# # Compute RMSE after trimming x, y by Tmin, Tmax
+# function _rmse_trimmed(x, y, Tmin, Tmax; kwargs...)
+#     x_trimmed, y_trimmed = trim_array.((x, y), Tmin, Tmax)
+#     rmse = _rmse_missing(x_trimmed, y_trimmed; kwargs...)
+
+#     return rmse
+# end
+
+function _shift_trim(x, shift, Tmin, Tmax; trim_first=false)
+
+    if trim_first
+        x_trimmed = trim_array(x, Tmin, Tmax)
+        return lag(x_trimmed, shift)
+    else
+        x_shifted = lag(x, shift)
+        return trim_array(x_shifted, Tmin, Tmax)
     end
 end
 
 
-# Compute RMSE after shifting x
-function rmse_shifted(x, y, shift; kwargs...)
-    return _rmse_missing(lag(x, shift), y; kwargs...)
+# Combine shifting and trimming
+# NOTE: kwargs contain dims, square, normalize
+function _rmse_shifted_trimmed(x, y, shift, Tmin, Tmax;
+                               trim_first=false, kwargs...)
+
+    x_ = _shift_trim(x, shift, Tmin, Tmax, trim_first=trim_first)
+    y_ = trim_array(y, Tmin, Tmax)
+    
+    return _rmse_missing(x_, y_; kwargs...)
+    
+    # if trim_first
+    #     # Trim before shifting
+    #     x_trimmed, y_trimmed = trim_arrays.((x, y), Tmin, Tmax)
+    #     rmse = _rmse_shifted(x_trimmed, y_trimmed,
+    #                           dims=dims, square=square)
+    # else
+    #     # Shift before trimming
+    #     rmse = _rmse_trimmed(lag(x, shift), y, Tmin, Tmax; kwargs...)
+    # end
+
 end
 
-
+# NOTE: kwargs contain dims, square, normalize, penaltyfunc, penalty_kwargs
 function __rmse(x, y, shift::Integer, Tmin::Number, Tmax::Number;
-                mask, copy, kwargs...)
+                mask=nothing, copy=true, penaltyfunc=nothing, penalize_x=true,
+                penalty_kwargs=Dict(:dims=>1), kwargs...)
 
     # Mask x, y
     if copy
@@ -75,12 +134,25 @@ function __rmse(x, y, shift::Integer, Tmin::Number, Tmax::Number;
         mask_array!(y, mask)
     end
 
-    return rmse_shifted_trimmed(x_, y_, shift, Tmin, Tmax; kwargs...)
+    # HACK: To prevent taking square root twice
+    # square = pop!(kwargs, "square", nothing)
+    mse = _rmse_shifted_trimmed(x_, y_, shift, Tmin, Tmax; square=true, kwargs...)
+    
+    # Penalize RMSE based on shift, Tmin, Tmax
+    if isnothing(penaltyfunc)
+        return sqrt.(mse)
+    else
+        if penalize_x
+            penalty_val = penaltyfunc(x_, shift, Tmin, Tmax; penalty_kwargs...)
+        else
+            penalty_val = penaltyfunc(y_, shift, Tmin, Tmax; penalty_kwargs...)
+        end
+        return sqrt.(mse .+ penalty_val)
+    end
 end
 
-# NOTE: kwargs contain dims, square, mask, copy
-function _rmse(x, y, shift::Integer, Tmin::AbstractFloat, Tmax::AbstractFloat;
-               kwargs...)
+# NOTE: kwargs contain dims, square, normalize, mask, copy, penaltyfunc, penalty_kwargs
+function _rmse(x, y, shift::Integer, Tmin::AbstractFloat, Tmax::AbstractFloat; kwargs...)
 
     rmse = __rmse(x, y, shift, Tmin, Tmax; kwargs...)
     return rmse, (shift=shift, Tmin=Tmin, Tmax=Tmax)
@@ -102,9 +174,13 @@ function _rmse(x, y, shift::Vector, Tmin::Vector, Tmax::Vector; kwargs...)
         res[i,j,k,:] = __rmse(x, y, shift[i], Tmin[j], Tmax[k]; kwargs...)
     end
 
-    # Take min of the mean over QOIs
 
-    min_idx = mean(res, dims=4) |> argmin |> (x -> x.I[1:end-1])
+    # Take argmin of shift for Ur
+    min_idx = res[:,:,:,1:1] |> argmin |> (x -> x.I[1:end-1])
+
+    # Take min of the mean over QOIs
+    # min_idx = mean(res, dims=4) |> argmin |> (x -> x.I[1:end-1])
+
     min_rmse = res[min_idx...,:]
 
     best_params = (shift=shift[min_idx[1]],
@@ -166,39 +242,35 @@ function trim_array(x, Tmin, Tmax; dim=1)
     return selectdim(x, dim, Tmin_idx:Tmax_idx)
 end
 
+function mean_max_distance(x; dims=1)
+    
+    x_max = maximum(x, dims=dims)
+    x_min = minimum(x, dims=dims)
 
-# Compute RMSE after trimming x, y by Tmin, Tmax
-function rmse_trimmed(x, y, Tmin, Tmax; kwargs...)
-    x_trimmed, y_trimmed = trim_array.((x, y), Tmin, Tmax)
-    rmse = _rmse_missing(x_trimmed, y_trimmed; kwargs...)
-
-    return rmse
+    return mean(max.(x_max .- x, x .- x_min).^2, dims=dims)
 end
 
 
-# NOTE: kwargs contain dims, square
-function rmse_shifted_trimmed(x, y, shift, Tmin, Tmax;
-                              trim_first=false, kwargs...)
+function timeshift_penalty(x, shift=0, Tmin=0.2, Tmax=0.8; var_measure=mean_max_distance,
+                           max_shift=48, lambda=1.0, trim_first=false, kwargs...)
+    
+    x_ = _shift_trim(x, shift, Tmin, Tmax; trim_first=trim_first)
+    
+    penalty = (collect ∘ Iterators.flatten)(
+        (shift/max_shift)^2 * var_measure(x_; kwargs...)
+    )
 
-    if trim_first
-        # Trim before shifting
-        x_trimmed, y_trimmed = trim_arrays.((x, y), Tmin, Tmax)
-        rmse = rmse_shifted(x_trimmed, y_trimmed,
-                            dims=dims, square=square)
-    else
-        # Shift before trimming
-        rmse = rmse_trimmed(lag(x, shift), y, Tmin, Tmax; kwargs...)
-    end
-
-    return rmse
+    return lambda .* penalty 
 end
 
 
 # Compute RMSE with options to shift, trim, and mask x, y
-function rmse(x, y; shift=0, Tmin=0.0, Tmax=1.0, mask=nothing, square=false,
-              copy=true, dims=2)
-    return _rmse(x, y, shift, Tmin, Tmax, mask=mask, square=square, copy=copy,
-                 dims=dims)
+function rmse(x, y; shift=0, Tmin=0.0, Tmax=1.0, mask=nothing,
+              copy=true, dims=2, normalize=false, penaltyfunc=nothing,
+              penalty_kwargs=Dict(:dims=>1), penalize_x=true)
+    return _rmse(x, y, shift, Tmin, Tmax, mask=mask, copy=copy,
+                 dims=dims, normalize=normalize, penaltyfunc=penaltyfunc,
+                 penalty_kwargs=penalty_kwargs, penalize=true)
 end
 
 
