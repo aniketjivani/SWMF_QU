@@ -1,0 +1,82 @@
+diff a/JuliaFiles/2021_02_26_RunExploration/Scripts/metricsTools.jl b/JuliaFiles/2021_02_26_RunExploration/Scripts/metricsTools.jl	(rejected hunks)
+@@ -77,79 +77,74 @@ end
+ RMSE(x::Array, obs::Array) = sqrt(mean((x .- obs).^2))
+ computeMaskedRMSE(x, y, mask) = computeMaskedMetric(x, y, mask, RMSE)
+ 
+ 
+ function _get_missing_array(z, timeshift)
+     if ndims(z) > 1
+         missingArray = repeat([missing], timeshift, size(z)[2])
+     else
+         missingArray = repeat([missing], timeshift)
+     end
+ 
+     return missingArray
+ end
+ 
+ 
+ function shift_array(x::Array, y::Array, timeshift::Int)
+ 
+     @assert size(x)[1] == size(y)[1] "x, y don't have the same number of rows!"
+ 
+     # Shift x if timeshift > 0
+     # Shift y if timeshift < 0
+     if timeshift > 0
+         x_shifted = vcat(_get_missing_array(x, timeshift), x)
+         y_shifted = vcat(y, _get_missing_array(y, timeshift))
+ 
+     else
+         x_shifted = vcat(x, _get_missing_array(x, -timeshift))
+         y_shifted = vcat(_get_missing_array(y, -timeshift), y)
+     end
+ 
+     return x_shifted, y_shifted
+ 
+ end
+ 
+ function trim_array(x, y, Tmin, Tmax)
+ 
+ 
+     TminIdx = Int(ceil(Tmin * size(x)[1]))
+ 
+     if Tmin == 0
+         TminIdx = TminIdx + 1
+     end
+ 
+     TmaxIdx = Int(floor(Tmax * size(x)[1]))
+ 
+     if ndims(x) > 1
+         xTrimmed = x[TminIdx:TmaxIdx,:]
+     else
+         xTrimmed = x[TminIdx:TmaxIdx]
+     end
+ 
+     if ndims(y) > 1
+         yTrimmed = y[TminIdx:TmaxIdx,:]
+     else
+         yTrimmed = y[TminIdx:TmaxIdx]
+     end
+ 
+     return xTrimmed, yTrimmed
+ 
+ end
+ 
+ function shift_trim_array(x, y, timeshift, Tmin, Tmax)
+ 
+     x_shifted, y_shifted = shift_array(x, y, timeshift)
+     x_trimmed, y_trimmed = trim_array(x_shifted, y_shifted, Tmin, Tmax)
+ 
+-function meanNA(x::Array; dims::Union{Int,Nothing}=nothing)
+-    if isnothing(dims) || ndims(x) == 1
+-        return mean(skipmissing(x))
+-    else
+-       return map(mean, skipmissing.(eachslice(x, dims=dims)))
+-    end
++    return x_trimmed, y_trimmed
+ 
+ end
+ 
+ """
+     function shiftedRMSE(x::Array, y::Array, timeshift::Int,
+                         Tmin::Int, Tmax::Int, shiftx::Bool=true)
+ 

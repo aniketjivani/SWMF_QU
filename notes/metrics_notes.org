@@ -1,0 +1,6 @@
+#+TITLE: Notes on metrics for SWMF QU
+#+AUTHOR: Daniel Iong
+#+LATEX_CLASS_OPTIONS: article
+#+OPTIONS: toc:nil
+
+* Penalizing timeshift

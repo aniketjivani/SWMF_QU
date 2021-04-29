@@ -1,0 +1,44 @@
+#+TITLE: Penalized shifted and trimmed RMSE
+#+latex_class: article
+#+latex_class_options:
+#+latex_header: \usepackage[margin=1in]{geometry}
+#+latex_header_extra:
+#+description:
+#+keywords:
+#+subtitle:
+#+latex_compiler: pdflatex
+#+date: \today
+#+OPTIONS: toc:nil tex:t
+
+Let $x_{t}$, $y_{t}$, $t = 1, \dots T$, denote the simulated and observed trajectory, respectively, for a given configuration. To account for time-shifts, we compute the following modified MSE metric.
+
+#+begin_export latex
+\begin{equation}
+\underset{s \in \mathcal{S}}{\text{min}} \sum_{t=T_{\text{min}}}^{T_{\text{max}}} (y_{t} - x_{t+s})^{2}
+\label{eq:rmse}
+\end{equation}
+#+end_export
+
+where $\mathcal{S} = {-48,\dots,48}$, $T_{\text{min}} = 0.2 \times T$, and $T_{\text{max}} = 0.8 \times T$.
+
+* Penalizing timeshift
+
+For many of the configurations, the shift $s$ that minimizes $\ref{eq:rmse}$ is -48 or 48 which is not desirable. Therefore, we penalize timeshift by adding the following term to $\ref{eq:rmse}$.
+
+#+begin_export latex
+\begin{equation}
+ P_{s}(x) = (s / s_{\text{max}})^{2} \text{Var}(\tilde{x})
+\end{equation}
+#+end_export
+
+where $s_{\text{max}} = 48$ and $\tilde{x} = \{x_{t}: t = T_{\text{min}},\dots,T_{\text{max}}\}$. We tried a couple different penalties but the one based on variance seems to be the most reasonable.
+
+* Penalized shifted and trimmed RMSE
+
+The final RMSE metric we calculate is given by
+
+#+begin_export latex
+\begin{equation*}
+\sqrt{\underset{s \in \mathcal{S}}{\text{min}} \Big\{ \sum_{t=T_{\text{min}}}^{T_{\text{max}}} (y_{t} - x_{t+s})^{2} + P_{s}(x) \Big\}
+\end{equation*}
+#+end_export
