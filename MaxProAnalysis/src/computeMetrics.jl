@@ -1,15 +1,46 @@
-using DelimitedFiles, CSV, DataFrames, Statistics, AxisArrays
+using ArgParse, DelimitedFiles, CSV, DataFrames, Statistics, AxisArrays
+
+s = ArgParseSettings(
+    description="This script is used to compute time-shifted metrics between simulated and observed trajectories for SWQU.")
+@add_arg_table! s begin
+    "--inputs-outputs-path"
+        help = "Path to inputs_outputs file."
+        default = "./data/MaxPro_inputs_outputs.txt"
+    "--qois-path"
+        help = "Path to QoIs directory."
+        default = "./Outputs/QoIs/"
+    "--output", "-o"
+        help = "Path to save metrics to."
+        default = "./Outputs/QoIs/metrics.csv"
+    "--qois", "-q"
+        help = "List of QOIs. Timeshift in RMSE is obtained with respect to the first variable in this list."
+        nargs = '*'
+        action = :store_arg
+        default=["Ur", "Np", "B", "T"]
+    "--obs-suffix"
+        help = "Filename suffix for observations." 
+        default = "Obs_earth_sta"
+    "--sim-suffix"
+        help = "Filename suffix for simulations."
+        default = "Sim_earth"
+    "--ext"
+        help = "File extension for observations/simulations."
+        default = ".txt"
+end
+
+args = parse_args(s)
 
 include("../../scripts/metricsTools.jl")
 
-INPUTS_OUTPUTS_PATH = "./data/MaxPro_inputs_outputs.txt"
-QOIS_PATH = "./Outputs/QoIs/"
-RESULTS_PATH = "./Outputs/QoIs/metrics.csv" # Path to save results to
+INPUTS_OUTPUTS_PATH = args["inputs-outputs-path"]
+QOIS_PATH = args["qois-path"]
+RESULTS_PATH = args["output"]
 
-QOIS = ["B", "Np", "T", "Ur"]
-SUFFIXES = Dict(:obs=>"Obs_earth_sta",
-                :sim=>"Sim_earth")
-EXT = ".txt"
+# timeshift in rmse is obtained with respect to first variable in this list
+QOIS = args["qois"]
+SUFFIXES = Dict(:obs=>args["obs-suffix"],
+                :sim=>args["sim-suffix"])
+EXT = args["ext"]
 
 # Parameters for computing timeshifted RMSE
 timeshifts = collect(-48:48);
