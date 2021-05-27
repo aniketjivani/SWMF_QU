@@ -1,0 +1,3 @@
+model=AWSoM
+map=ADAPT_CR2208.fits
+realizations=1

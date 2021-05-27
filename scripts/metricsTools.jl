@@ -352,6 +352,8 @@ export mean_missing,
     rmse_shifted_trimmed,
     mask_array!,
     rmse_masked,
-    compute_metrics
+    compute_metrics,
+    _get_trim_index,
+    trim_array
 
 end

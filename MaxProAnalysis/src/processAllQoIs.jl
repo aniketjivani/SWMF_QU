@@ -1,6 +1,6 @@
 # Obtain all QoIs from simulation / observation files for successful MaxPro runs!
 # PWD should be MaxProAnalysis
-include("./src/MaxProAnalysis.jl")
+include("MaxProAnalysis.jl")
 
 using Plots
 gr()
@@ -19,14 +19,21 @@ mg = "ADAPT"
 md = "AWSoM"
 cr = 2208
 
-ips, ipNames = readdlm("./data/MaxPro_inputs_outputs.txt", 
+INPUTS_OUTPUTS_PATH ="./data/MaxPro_inputs_outputs.txt"
+QOIS_PATH = "./Outputs/QoIs/code_v_2021_05_17/event_list_2021_04_16_09"
+
+
+ips, ipNames = readdlm(INPUTS_OUTPUTS_PATH, 
                         header=true, 
                         ','
                         );
 ipTable = DataFrame(ips, :auto);
 rename!(ipTable, vec(ipNames));
 
-IHData, IHColumns = readdlm("./data/L1_Apr23/run001_AWSoM/run03/IH/trj_earth_n00005000.sat", 
+# change all outcomes to 1 and export
+ipTable.Outcomes = ones(Int, size(ipTable, 1))
+
+IHData, IHColumns = readdlm("./data/L1_runs_event_list_2021_04_16_09/run001_AWSoM/trj_earth_n00005000.sat", 
                             header=true, 
                             skipstart=1
                             );
@@ -109,11 +116,16 @@ Np = zeros(m, 200);
 T  = zeros(m, 200);
 B  = zeros(m, 200);
 for (runIdx, realization) in enumerate(ipTable[!, "REALIZATIONS_ADAPT"])
-    opFileName = joinpath("./data/L1_Apr23/", 
+    # opFileName = joinpath("./data/L1_Apr23/", 
+    #                     "run" * @sprintf("%03d", runIdx) * "_AWSoM", 
+    #                     "run" * @sprintf("%02d", realization), 
+    #                     "IH/", simFilePrefix[dataTrajectory] * "_n00005000.sat"
+    #                     )
+
+    opFileName = joinpath("./data/L1_runs_event_list_2021_04_16_09", 
                         "run" * @sprintf("%03d", runIdx) * "_AWSoM", 
-                        "run" * @sprintf("%02d", realization), 
-                        "IH/", simFilePrefix[dataTrajectory] * "_n00005000.sat"
-                        )
+                        simFilePrefix[dataTrajectory] * "_n00005000.sat")
+
     if isfile(opFileName)
         qoiObject = MaxProAnalysis.getQoIFromFile(opFileName, "sim")
         # push derived quantities into arrays
@@ -131,28 +143,10 @@ T  = T[1:end - 1, :];
 B  = B[1:end - 1, :];
 
 # # Write out all QoIs to .txt files
-# UrfileName = joinpath("./Outputs/QoIs/", "Ur" * "_" * dataTrajectory * ".txt")
-# NpfileName = joinpath("./Outputs/QoIs/", "Np" * "_" * dataTrajectory * ".txt")
-# TfileName = joinpath("./Outputs/QoIs/", "T" * "_" * dataTrajectory * ".txt")
-# BfileName = joinpath("./Outputs/QoIs/", "B" * "_" * dataTrajectory * ".txt")
-
-# open(UrfileName, "w") do io
-#     writedlm(io, Ur)
-# end
-# # close(UrfileName)
-# open(NpfileName, "w") do io
-#     writedlm(io, Np)
-# end
-# # close(NpfileName)
-# open(TfileName, "w") do io
-#     writedlm(io, T)
-# end
-# # close(TfileName)
-# open(BfileName, "w") do io
-#     writedlm(io, B)
-# end
-# # close(BfileName)
-
+UrfileName = joinpath(QOIS_PATH, "Ur" * "Sim_earth" * ".txt")
+NpfileName = joinpath(QOIS_PATH, "Np" * "Sim_earth" * ".txt")
+TfileName = joinpath(QOIS_PATH, "T" * "Sim_earth" * ".txt")
+BfileName = joinpath(QOIS_PATH, "B" * "Sim_earth" * ".txt")
 
 
 println("Simulation files processed.")

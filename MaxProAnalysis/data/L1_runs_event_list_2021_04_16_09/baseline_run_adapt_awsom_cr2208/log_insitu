@@ -1,0 +1,208 @@
+--------------------------------------------------------
+Running SSW, Last Updated: Wed Nov 2 22:22:51 GMT 2005
+ 
+PROBLEMS? - e-mail TO: freeland@penumbra.nascom.nasa.gov
+--------------------------------------------------------
+Executing SSW IDL_STARTUP for: GEN
+Executing SSW IDL_STARTUP for: AIA
+Including Paths:
+ ---------------------------------
+| $SSW/vobs/gen/idl               |
+| $SSW/vobs/ontology/idl/gen_temp |
+| $SSW/vobs/ontology/idl/jsoc     |
+| $SSW/vobs/ontology/idl          |
+ ---------------------------------
+Including Paths:
+ ----------------------------
+| $SSW/sdo/gen/idl/attitude  |
+| $SSW/sdo/gen/idl/utilities |
+ ----------------------------
+Executing SSW IDL_STARTUP for: HMI
+Including Paths:
+ ---------------------------------
+| $SSW/vobs/gen/idl               |
+| $SSW/vobs/ontology/idl/gen_temp |
+| $SSW/vobs/ontology/idl/jsoc     |
+| $SSW/vobs/ontology/idl          |
+ ---------------------------------
+Including Paths:
+ ----------------------------
+| $SSW/sdo/gen/idl/attitude  |
+| $SSW/sdo/gen/idl/utilities |
+ ----------------------------
+Executing SSW IDL_STARTUP for: XRT
+Including Paths:
+ -----------------------------------------------
+| $SSW/hinode/gen/idl/osdc                      |
+| $SSW/hinode/gen/idl/pointing                  |
+| $SSW/hinode/sot/idl/ct                        |
+| $SSW/hinode/sot/idl/fg/cal                    |
+| $SSW/hinode/sot/idl/fg/util                   |
+| $SSW/hinode/sot/idl/monitoring                |
+| $SSW/hinode/sot/idl/sodasurf                  |
+| $SSW/hinode/sot/idl/sp/util                   |
+| $SSW/hinode/sot/idl/sp/util_lmsal/sotsp_cubes |
+| $SSW/hinode/sot/idl/sp/util_lmsal             |
+| $SSW/hinode/sot/idl/sp                        |
+| $SSW/hinode/sot/idl/user/berger               |
+| $SSW/hinode/sot/idl/util                      |
+| $SSW/hinode/sot/idl                           |
+| $SSW/trace/idl/egse                           |
+| $SSW/trace/idl/info                           |
+| $SSW/trace/idl/ops                            |
+| $SSW/trace/idl/site                           |
+| $SSW/trace/idl/util                           |
+| $SSW/trace/idl/wwwidl                         |
+ -----------------------------------------------
+Executing SSW IDL_STARTUP for: EIT
+executing EIT IDL_STARTUP
+Executing SSW IDL_STARTUP for: LASCO
+Including Paths:
+ -----------------------------------------------
+| $SSW/packages/nrl/idl/nrlgen/aia              |
+| $SSW/packages/nrl/idl/nrlgen/analysis         |
+| $SSW/packages/nrl/idl/nrlgen/dfanning         |
+| $SSW/packages/nrl/idl/nrlgen/display/diva     |
+| $SSW/packages/nrl/idl/nrlgen/display          |
+| $SSW/packages/nrl/idl/nrlgen/lascoeit         |
+| $SSW/packages/nrl/idl/nrlgen/time             |
+| $SSW/packages/nrl/idl/nrlgen/util/discri_pobj |
+| $SSW/packages/nrl/idl/nrlgen/util             |
+| $SSW/packages/nrl/idl/nrlgen/widgets          |
+ -----------------------------------------------
+Executing SSW IDL_STARTUP for: SECCHI
+Including Paths:
+ -----------------------------
+| $SSW/packages/mjastereo/idl |
+ -----------------------------
+Including Paths:
+ -----------------------------------------------
+| $SSW/packages/nrl/idl/nrlgen/aia              |
+| $SSW/packages/nrl/idl/nrlgen/analysis         |
+| $SSW/packages/nrl/idl/nrlgen/dfanning         |
+| $SSW/packages/nrl/idl/nrlgen/display/diva     |
+| $SSW/packages/nrl/idl/nrlgen/display          |
+| $SSW/packages/nrl/idl/nrlgen/lascoeit         |
+| $SSW/packages/nrl/idl/nrlgen/time             |
+| $SSW/packages/nrl/idl/nrlgen/util/discri_pobj |
+| $SSW/packages/nrl/idl/nrlgen/util             |
+| $SSW/packages/nrl/idl/nrlgen/widgets          |
+ -----------------------------------------------
+Including Paths:
+ ----------------------------
+| $SSW/packages/sunspice/idl |
+ ----------------------------
+Registering DLM /home/zghuang/ssw/packages/sunspice/icy/linux_x86_64/lib/icy.dlm
+Executing SSW IDL_STARTUP for: SITE
+Executing SSW IDL_STARTUP: (Personal)
+Including Paths:
+ -----------------------------------------------
+| $SSW/stereo/gen/idl/spice/legacy              |
+| $SSW/stereo/gen/idl/spice                     |
+| $SSW/stereo/gen/idl/telemetry                 |
+| $SSW/stereo/impact/idl/beacon                 |
+| $SSW/stereo/plastic/idl                       |
+| $SSW/stereo/secchi/data/PT/IN/OTHER           |
+| $SSW/stereo/secchi/data/PT/PRO                |
+| $SSW/stereo/secchi/data/templates             |
+| $SSW/stereo/secchi/data                       |
+| $SSW/stereo/secchi/idl/astrometry             |
+| $SSW/stereo/secchi/idl/cor1                   |
+| $SSW/stereo/secchi/idl/cor2                   |
+| $SSW/stereo/secchi/idl/daily                  |
+| $SSW/stereo/secchi/idl/database               |
+| $SSW/stereo/secchi/idl/display/jmaps/curvefit |
+| $SSW/stereo/secchi/idl/display/jmaps/insitu   |
+| $SSW/stereo/secchi/idl/display/jmaps          |
+| $SSW/stereo/secchi/idl/display/movie/star_rem |
+| $SSW/stereo/secchi/idl/display/movie          |
+| $SSW/stereo/secchi/idl/display/sunloop/vicar  |
+| $SSW/stereo/secchi/idl/display/sunloop        |
+| $SSW/stereo/secchi/idl/display                |
+| $SSW/stereo/secchi/idl/euvi                   |
+| $SSW/stereo/secchi/idl/hi/calib               |
+| $SSW/stereo/secchi/idl/hi/cosmics             |
+| $SSW/stereo/secchi/idl/hi                     |
+| $SSW/stereo/secchi/idl/jpl/satplot            |
+| $SSW/stereo/secchi/idl/packets                |
+| $SSW/stereo/secchi/idl/pipeline               |
+| $SSW/stereo/secchi/idl/planning/blocksched    |
+| $SSW/stereo/secchi/idl/planning               |
+| $SSW/stereo/secchi/idl/prep/cor               |
+| $SSW/stereo/secchi/idl/prep/euvi              |
+| $SSW/stereo/secchi/idl/prep/hi                |
+| $SSW/stereo/secchi/idl/prep                   |
+| $SSW/stereo/secchi/idl/sccgen                 |
+| $SSW/stereo/secchi/idl/scraytrace             |
+| $SSW/stereo/secchi/idl                        |
+| $SSW/stereo/ssc/idl/archive                   |
+| $SSW/stereo/ssc/idl/beacon                    |
+| $SSW/stereo/ssc/idl/browse                    |
+| $SSW/stereo/ssc/idl/planning                  |
+| $SSW/stereo/ssc/idl/spice                     |
+| $SSW/stereo/ssc/idl/telemetry                 |
+ -----------------------------------------------
++++++++++++++++++++++++++++++++++++++++++++++++++++++
+compare_remote: dir_obs    =/home/zghuang/GIT/SWMF/SWMFSOLAR/Results/obsdata
+compare_remote: files_sim  =
+compare_remote: dirs_adapt =
+/home/zghuang/GIT/SWMF/SWMFSOLAR/Results/run002_AWSoM/run01
+compare_insitu_one: DoSaveObs=       0
+Calculating integrated curve distance between obs. & SWMF output at 1 AU
+Normalizations:
+T_NORM          INT       =       10
+U_NORM          FLOAT     =       373.000
+N_NORM          FLOAT     =       23.6000
+TEM_NORM        FLOAT     =       340362.
+MAG_NORM        FLOAT     =       13.0000
+Integrated  Curve distance (Ur, Np, T, B) is:   0.105 0.1662 0.0707 0.1315
+compare_insitu_one: DoSaveObs=       0
+Calculating integrated curve distance between obs. & SWMF output at 1 AU
+Normalizations:
+T_NORM          INT       =       10
+U_NORM          FLOAT     =       411.000
+N_NORM          FLOAT     =       41.7800
+TEM_NORM        FLOAT     =       483400.
+MAG_NORM        FLOAT     =       15.0000
+Integrated  Curve distance (Ur, Np, T, B) is:   0.131 0.0757 0.1295 0.0845
+An HTTP error has occurred.
+IDLNETURL::PUT:  CCurlException:  Error: Http Post Request Failed. Error =  http: Client Error. Remote
+              Host(cdaweb.gsfc.nasa.gov), Http ErrCode(404), Http Err(Not Found) Http ErrMsg(No HTML found).
+HTTP response code =          404
+HTTP response header = 
+HTTP/1.1 404 Not Found
+Date: Mon, 24 May 2021 23:17:15 GMT
+Server: Apache
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Content-Security-Policy: frame-ancestors 'self' *.gsfc.nasa.gov;
+Vary: Accept-Encoding
+Content-Type: application/xml
+Content-Length: 349
+X-Frame-Options: SAMEORIGIN
+
+
+HTTP response filename = /home/zghuang/GIT/SWMF/share/IDL/Solar/PutRsp.dat
+HTTP Error Response
+ Could not obtain Stereo B data.
+ Error: no observational data are found.
+compare_insitu_one: DoSaveObs=       0
+An HTTP error has occurred.
+IDLNETURL::PUT:  CCurlException:  Error: Http Post Request Failed. Error =  http: Client Error. Remote
+              Host(cdaweb.gsfc.nasa.gov), Http ErrCode(404), Http Err(Not Found) Http ErrMsg(No HTML found).
+HTTP response code =          404
+HTTP response header = 
+HTTP/1.1 404 Not Found
+Date: Mon, 24 May 2021 23:17:15 GMT
+Server: Apache
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Content-Security-Policy: frame-ancestors 'self' *.gsfc.nasa.gov;
+Vary: Accept-Encoding
+Content-Type: application/xml
+Content-Length: 349
+X-Frame-Options: SAMEORIGIN
+
+
+HTTP response filename = /home/zghuang/GIT/SWMF/share/IDL/Solar/PutRsp.dat
+HTTP Error Response
+ Could not obtain Stereo B data.
+compare_insitu_one: error: no observational data are found.
