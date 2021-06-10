@@ -1,6 +1,6 @@
 # Obtain all QoIs from simulation / observation files for successful MaxPro runs!
 # PWD should be MaxProAnalysis
-include("MaxProAnalysis.jl")
+include("./src/MaxProAnalysis.jl")
 
 using Plots
 gr()
@@ -17,30 +17,29 @@ using JLD
 
 mg = "ADAPT"
 md = "AWSoM"
-cr = 2208
+cr = 2152
 
-INPUTS_OUTPUTS_PATH ="./data/MaxPro_inputs_outputs.txt"
-QOIS_PATH = "./Outputs/QoIs/code_v_2021_05_17/event_list_2021_04_16_09"
+INPUTS_PATH ="./data/MaxPro_inputs_outputs_event_list_2021_06_02_21.txt"
+OUTPUTS_PATH = "./data/L1_runs_event_list_2021_06_02_21"
+QOIS_PATH = "./Outputs/QoIs/code_v_2021_05_17/event_list_2021_06_02_21"
 
 
-ips, ipNames = readdlm(INPUTS_OUTPUTS_PATH, 
+ips, ipNames = readdlm(INPUTS_PATH, 
                         header=true, 
                         ','
                         );
 ipTable = DataFrame(ips, :auto);
 rename!(ipTable, vec(ipNames));
 
-# change all outcomes to 1 and export
-ipTable.Outcomes = ones(Int, size(ipTable, 1))
 
-IHData, IHColumns = readdlm("./data/L1_runs_event_list_2021_04_16_09/run001_AWSoM/trj_earth_n00005000.sat", 
+
+IHData, IHColumns = readdlm(joinpath(OUTPUTS_PATH, "run001_AWSoM/trj_earth_n00005000.sat"), 
                             header=true, 
                             skipstart=1
                             );
 IHDF = DataFrame(IHData, :auto);
 rename!(IHDF, vec(IHColumns));
 m, n = size(IHData)
-
 
 
 ##### Observation files #####
@@ -73,10 +72,10 @@ TObs  = TObs[1:end - 1, :];
 BObs  = BObs[1:end - 1, :];
 
 # # Write out all QoIs to .txt files
-# UrfileName = joinpath("./Outputs/QoIs/", "UrObs" * ".txt")
-# NpfileName = joinpath("./Outputs/QoIs/", "NpObs" *  ".txt")
-# TfileName = joinpath("./Outputs/QoIs/", "TObs" * ".txt")
-# BfileName = joinpath("./Outputs/QoIs/", "BObs"  * ".txt")
+# UrfileName = joinpath(QOIS_PATH, "UrObs_earth_sta" * ".txt")
+# NpfileName = joinpath(QOIS_PATH, "NpObs_earth_sta" *  ".txt")
+# TfileName = joinpath(QOIS_PATH, "TObs_earth_sta" * ".txt")
+# BfileName = joinpath(QOIS_PATH, "BObs_earth_sta"  * ".txt")
 
 # open(UrfileName, "w") do io
 #     writedlm(io, UrObs)
@@ -98,7 +97,7 @@ BObs  = BObs[1:end - 1, :];
 
 ##### Simulation files #####
 tmPeriods = Dates.DateTime.(IHDF[!, :year], IHDF[!, :mo], IHDF[!, :dy], IHDF[!, :hr], IHDF[!, :mn], IHDF[!, :sc])
-save("./Outputs/QoIs/tmPeriods_earth_cr2208.jld", "tmPeriods", tmPeriods)
+save("./Outputs/QoIs/tmPeriods_earth_cr2152.jld", "tmPeriods", tmPeriods)
 
 dataTrajectory = "EARTH"
 # dataTrajectory = "STEREO-A"
@@ -116,13 +115,9 @@ Np = zeros(m, 200);
 T  = zeros(m, 200);
 B  = zeros(m, 200);
 for (runIdx, realization) in enumerate(ipTable[!, "REALIZATIONS_ADAPT"])
-    # opFileName = joinpath("./data/L1_Apr23/", 
-    #                     "run" * @sprintf("%03d", runIdx) * "_AWSoM", 
-    #                     "run" * @sprintf("%02d", realization), 
-    #                     "IH/", simFilePrefix[dataTrajectory] * "_n00005000.sat"
-    #                     )
 
-    opFileName = joinpath("./data/L1_runs_event_list_2021_04_16_09", 
+
+    opFileName = joinpath(OUTPUTS_PATH, 
                         "run" * @sprintf("%03d", runIdx) * "_AWSoM", 
                         simFilePrefix[dataTrajectory] * "_n00005000.sat")
 
