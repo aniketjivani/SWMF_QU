@@ -41,6 +41,7 @@ Failed runs can be identified by the value in the `Outcomes` column for the corr
   
   * exportShiftedTrimmedQoIs.jl: Process the QoIs in the relevant folders (both sim and obs) and export shifted / trimmed versions of them using the functions in the Julia module [`metricsTools.jl`](https://github.com/danieliong/SWMF_QU/blob/metrics/scripts/metricsTools.jl)
 
-  * processAllQoIs.jl: Takes in as input the unzipped L1.tgz runs, for example: [Path to unzipped runs for Solar Maximum](https://github.com/danieliong/SWMF_QU/tree/metrics/MaxProAnalysis/data/L1_runs_event_list_2021_06_02_21) and processes simulations and observations for 4 QoIs - Ur, Np, T and B. These can then be written to appropriate path under `Outputs/QoIs`.
+**NOTE**: The QoIs obtained from here are useful for sensitivity analysis. If used, the number of time points reduces from original 720, depending on the size of the region where QoIs are compared with the data (433 time points from 0.2 to 0.8). The scripts for sensitivity analysis make use of the [ChaosPy Library](https://github.com/jonathf/chaospy/tree/master/chaospy) written in Python and have not been pushed yet to the repo. 
 
+  * processAllQoIs.jl: Takes in as input the unzipped L1.tgz runs, for example: [Path to unzipped runs for Solar Maximum](https://github.com/danieliong/SWMF_QU/tree/metrics/MaxProAnalysis/data/L1_runs_event_list_2021_06_02_21) and processes simulations and observations for 4 QoIs - Ur, Np, T and B. These can then be written to appropriate path under `Outputs/QoIs`.
 
