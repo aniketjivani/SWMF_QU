@@ -30,11 +30,9 @@ Failed runs can be identified by the value in the `Outcomes` column for the corr
 
 
 2) [data](https://github.com/danieliong/SWMF_QU/tree/metrics/MaxProAnalysis/data)
-  * Solar Min Input List: [Solar Min Inputs]
-(https://github.com/danieliong/SWMF_QU/blob/metrics/MaxProAnalysis/data/MaxPro_inputs_outputs_event_list_2021_04_16_09.txt)
+  * Solar Min Input List: [Solar Min Inputs](https://github.com/danieliong/SWMF_QU/blob/metrics/MaxProAnalysis/data/MaxPro_inputs_outputs_event_list_2021_04_16_09.txt)
 
-  * Solar Max Input List: [Solar Max Inputs]
-(https://github.com/danieliong/SWMF_QU/blob/metrics/MaxProAnalysis/data/MaxPro_inputs_outputs_event_list_2021_06_02_21.txt)
+  * Solar Max Input List: [Solar Max Inputs](https://github.com/danieliong/SWMF_QU/blob/metrics/MaxProAnalysis/data/MaxPro_inputs_outputs_event_list_2021_06_02_21.txt)
   
 
 3) [src](https://github.com/danieliong/SWMF_QU/tree/metrics/MaxProAnalysis/src)
