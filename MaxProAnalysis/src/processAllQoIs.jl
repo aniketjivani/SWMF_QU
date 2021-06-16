@@ -23,7 +23,6 @@ INPUTS_PATH ="./data/MaxPro_inputs_outputs_event_list_2021_06_02_21.txt"
 OUTPUTS_PATH = "./data/L1_runs_event_list_2021_06_02_21"
 QOIS_PATH = "./Outputs/QoIs/code_v_2021_05_17/event_list_2021_06_02_21"
 
-
 ips, ipNames = readdlm(INPUTS_PATH, 
                         header=true, 
                         ','
@@ -142,7 +141,6 @@ UrfileName = joinpath(QOIS_PATH, "Ur" * "Sim_earth" * ".txt")
 NpfileName = joinpath(QOIS_PATH, "Np" * "Sim_earth" * ".txt")
 TfileName = joinpath(QOIS_PATH, "T" * "Sim_earth" * ".txt")
 BfileName = joinpath(QOIS_PATH, "B" * "Sim_earth" * ".txt")
-
 
 println("Simulation files processed.")
 
