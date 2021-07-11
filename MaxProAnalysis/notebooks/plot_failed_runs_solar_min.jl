@@ -30,16 +30,19 @@ begin
 	using Dates
 end
 
+# ╔═╡ ba46b044-2ab6-4854-822d-592a4d6c3265
+using VegaLite
+
 # ╔═╡ c0e6912a-17cc-431b-9b0e-6b54e3480256
 begin
 	mg = "ADAPT"
 	md = "AWSoM"
-	cr = 2152
+	cr = 2208
 end
 
 # ╔═╡ 0a1f12f9-69c9-43be-a351-714398305c95
 begin
-	ips, _ = readdlm("../data/MaxPro_inputs_outputs_event_list_2021_06_02_21.txt", ',', header=true)
+	ips, _ = readdlm("../data/MaxPro_inputs_outputs_event_list_2021_04_16_09.txt", ',', header=true)
 	ipNames = ["BrFactor", 
 		"nChromoSi", 
 		"PoyntingFlux", 
@@ -62,46 +65,39 @@ end
 
 # ╔═╡ 9f41d95a-4fdb-4514-b9e3-8655db9064fb
 begin
-	failedRuns   = [61, 104, 135, 137, 143, 148, 160, 182, 184]
-	excludedRuns = [40, 43, 76, 86, 96, 110]
-	removedRuns = vcat(failedRuns, 
-					   excludedRuns)
+	runsToKeep = readdlm("../Outputs/QoIs/code_v_2021_05_17/event_list_2021_04_16_09/np_less_than_hundred.txt", Int64)[:]
+
+	removedRuns = setdiff(1:200, runsToKeep)
+
 end
+
+# ╔═╡ aa61a977-fc14-4111-ba14-6991273c6607
+runsToKeep
+
+# ╔═╡ 13e4bc15-680a-4a05-84d0-9caf90764ab1
+removedRuns2 = setdiff(1:200, runsToKeep)
 
 # ╔═╡ b1bd3c8b-9e7d-406e-a6d3-44345a5b94bb
 begin
-	successfulRunInputs = ipTable[Not(failedRuns), :]
-	failedRunInputs = ipTable[failedRuns, :]
-	excludedRunInputs = ipTable[excludedRuns, :]
-end
-
-# ╔═╡ d6b27006-2c3d-4280-bc30-2c8f279438c1
-# we remove all runs where Np value exceeds 100 - this left behind 69 runs out of a possible 191.
-np_runs_to_keep = readdlm("../Outputs/QoIs/code_v_2021_05_17/event_list_2021_06_02_21/np_less_than_hundred.txt", Int64)[:]
-
-# ╔═╡ 63d6bf11-581b-410e-b12a-b643a9f6e479
-# these runs are removed on the basis of Ur being less than 200! (overall criterion is: 200 < Ur < 900 km / s)
-np_more_runs_to_remove = [18, 24, 25, 37, 41, 53, 106, 127, 164, 173]
-
-# ╔═╡ 19c1dadb-73dc-4c50-aa2a-27fcb845e117
-ur_np_runs_to_keep = setdiff(np_runs_to_keep, np_more_runs_to_remove)
-
-# ╔═╡ 652708aa-a500-4616-9157-a89d27afe423
-begin
-	successful_runs_Np = ipTable[np_runs_to_keep, :]
-	failed_runs_Np = ipTable[failedRuns, :]
-	excluded_runs_Np = ipTable[Not(vcat(np_runs_to_keep, failedRuns)), :]
-	successful_runs_UrNp = ipTable[ur_np_runs_to_keep, :]
+	successfulRunInputs = ipTable[runsToKeep, :];
+	# failedRunInputs = ipTable[failedRuns, :]
+	excludedRunInputs = ipTable[removedRuns, :];
+	first(excludedRunInputs, 5)
 end
 
 # ╔═╡ d445e43f-d88c-49b1-9f60-36a66662b73a
 ipRange = 1:200
 
 # ╔═╡ 257eac68-7384-4202-89b6-5a847e6d67b7
-collect(ipRange[Not(vcat(np_runs_to_keep, failedRuns))])
+# collect(ipRange[Not(vcat(np_runs_to_keep, failedRuns))])
 
 # ╔═╡ 31bddd16-626d-41e5-baff-c5d4aaa77b4a
 cur_colors = palette(:default)
+
+# ╔═╡ 4cdf239c-f145-4ee4-a397-59a771570d93
+md"""
+145 runs are retained in the Solar Minimum case, having Np < 100
+"""
 
 # ╔═╡ e6d3978f-fbab-418e-96b3-35e15ab16d9a
 md"""
@@ -139,14 +135,15 @@ begin
                     successfulRunInputs[!, name_y],
                     label = "Successful Runs ",
                     markerstrokewidth=0)
-            scatter!(failedRunInputs[!, name_x],
-                     failedRunInputs[!, name_y], 
-                     label = "Failed Runs",
-                     markerstrokewidth=0)
+            # scatter!(failedRunInputs[!, name_x],
+            #          failedRunInputs[!, name_y], 
+            #          label = "Failed Runs",
+            #          markerstrokewidth=0)
             scatter!(excludedRunInputs[!, name_x],
                      excludedRunInputs[!, name_y], 
                      label = "Excluded Runs",
-                     markerstrokewidth=0)
+                     markerstrokewidth=0,
+					 marker=cur_colors[3])
             # scatter!(tuple(ipTable[47, name_x],
             #          ipTable[47, name_y]),
             #          markersize=6,
@@ -163,49 +160,18 @@ begin
                     text("Successful", cur_colors[1], :above, 12, :bold))
             annotate!(0.5 * (minimum(ipTable[!, name_x]) + maximum(ipTable[!, name_x])), 
                     1.015 * maximum(ipTable[!, name_y]), 
-                    text("Failed", cur_colors[2], :above, 12, :bold))
-            annotate!(0.8 * maximum(ipTable[!, name_x]), 
-                    1.015 * maximum(ipTable[!, name_y]), 
                     text("Excluded", cur_colors[3], :above, 12, :bold))
+            # annotate!(0.8 * maximum(ipTable[!, name_x]), 
+            #         1.015 * maximum(ipTable[!, name_y]), 
+            #         text("Excluded", cur_colors[3], :above, 12, :bold))
 #             annotate!(, 0.2e18, text("Failed", cur_colors[2], :below, 10, :bold))
 #             annotate!(1.62, 4.95e18, text("Excluded", cur_colors[3], :above, 10, :bold))
             plot!(xlabel=name_x, ylabel=name_y)
             plot!(legend=false)
-			plot!(title="Inputs coloured by excluded runs for Ur")
+			plot!(title="Inputs coloured by excluded runs for Np")
 #             figTitle = name_x * "vs" * name_y * ".pdf"
 #             savefig(joinpath("./Outputs/ScatterPlots", figTitle))
 end      
-
-# ╔═╡ f42db30c-5f02-4dec-aa07-3052ece1a245
-begin      
-            p2 = scatter(successful_runs_Np[!, name_x], 
-                    successful_runs_Np[!, name_y],
-                    label = "Successful Runs ",
-                    markerstrokewidth=0)
-            scatter!(failed_runs_Np[!, name_x],
-                     failed_runs_Np[!, name_y], 
-                     label = "Failed Runs",
-                     markerstrokewidth=0)
-            scatter!(excluded_runs_Np[!, name_x],
-                     excluded_runs_Np[!, name_y], 
-                     label = "Excluded Runs",
-                     markerstrokewidth=0)
-    
-            annotate!(1.35 * minimum(ipTable[!, name_x]), 
-                    1.015 * maximum(ipTable[!, name_y]), 
-                    text("Successful", cur_colors[1], :above, 12, :bold))
-            annotate!(0.5 * (minimum(ipTable[!, name_x]) + maximum(ipTable[!, name_x])), 
-                    1.015 * maximum(ipTable[!, name_y]), 
-                    text("Failed", cur_colors[2], :above, 12, :bold))
-            annotate!(0.8 * maximum(ipTable[!, name_x]), 
-                    1.015 * maximum(ipTable[!, name_y]), 
-                    text("Excluded", cur_colors[3], :above, 12, :bold))
-
-            plot!(xlabel=name_x, ylabel=name_y)
-            plot!(legend=false)
-			plot!(title="Inputs coloured by excluded runs for Np")
-
-end 
 
 # ╔═╡ 280b8277-cee8-4b8b-8343-bfc84b44f82d
 begin
@@ -221,108 +187,88 @@ begin
 
 	# ccol = cgrad([cur_colors[1], cur_colors[3]])
 	ccol = cgrad([RGB(0.3,0.3,0.8), RGB(0.3,0.9,0.5)])
-	contour(BrFactor, PoyntingFlux, energy, f=true, nlev=8, c=ccol)
+	contour(BrFactor, PoyntingFlux, energy, f=true, nlev=9, c=ccol)
 	
 	
-	scatter!(successful_runs_Np[!, x_var], 
-			successful_runs_Np[!, y_var],
+	scatter!(successfulRunInputs[!, x_var], 
+			successfulRunInputs[!, y_var],
 			label = "Successful Runs ",
 			markerstrokewidth=2, 
 			marker=cur_colors[1],
 			markersize=7)
-	scatter!(failed_runs_Np[!, x_var],
-			 failed_runs_Np[!, y_var], 
-			 label = "Failed Runs",
-			 markerstrokewidth=2,
-			marker=cur_colors[2],
-		 	markersize=7)
-	scatter!(excluded_runs_Np[!, x_var],
-			 excluded_runs_Np[!, y_var], 
+	# scatter!(failed_runs_Np[!, x_var],
+	# 		 failed_runs_Np[!, y_var], 
+	# 		 label = "Failed Runs",
+	# 		 # markerstrokewidth=0,
+	# 		marker=cur_colors[2],
+	# 	 	markersize=6)
+	scatter!(excludedRunInputs[!, x_var],
+			 excludedRunInputs[!, y_var], 
 			 label = "Excluded Runs",
 			 markerstrokewidth=2,
 			 marker=cur_colors[3],
 			 markersize=7)
-	scatter!(successful_runs_UrNp[!, x_var],
-		 successful_runs_UrNp[!, y_var], 
-		 markerstrokewidth=2,
-		 marker=cur_colors[4],
-		 markersize=7)
-	plot!(BrFactor, 7*10^5 ./BrFactor, linewidth=3)
-	plot!(BrFactor, 6*10^5 ./BrFactor, linewidth=3)
+	plot!(BrFactor, 7.7*10^5 ./ BrFactor, linewidth = 3)
+	plot!(BrFactor, 1.25*10^6 ./ BrFactor, linewidth = 3)
+	
 	annotate!(1.35 * minimum(ipTable[!, x_var]), 
 			1.02 * maximum(ipTable[!, y_var]), 
 			text("Successful", cur_colors[1], :above, 12, :bold))
-	annotate!(0.5 * (minimum(ipTable[!, x_var]) + maximum(ipTable[!, x_var])), 
-			1.02 * maximum(ipTable[!, y_var]), 
-			text("Failed", cur_colors[2], :above, 12, :bold))
+	# annotate!(0.5 * (minimum(ipTable[!, x_var]) + maximum(ipTable[!, x_var])), 
+	# 		1.02 * maximum(ipTable[!, y_var]), 
+	# 		text("Failed", cur_colors[2], :above, 12, :bold))
 	annotate!(0.8 * maximum(ipTable[!, x_var]), 
 			1.02 * maximum(ipTable[!, y_var]), 
 			text("Excluded", cur_colors[3], :above, 12, :bold))
 
+	plot!(xlim=(0.5, 2.7))
+	plot!(ylim=(2.5e5, 1.1e6))
+	
+	
 	plot!(xlabel=x_var, ylabel=y_var)
 	plot!(legend=false)
 	plot!(title="Inputs coloured by excluded runs for Np")
-	plot!(xlim=(0.5, 2.7))
-	plot!(ylim=(2.5e5, 1.1e6))
 	# plot!(xlim=extrema(BrFactor))
 	# plot!(ylim=extrema(PoyntingFlux))
 	plot!(size=(1000, 800))
 
 end
 
-# ╔═╡ 61ae8f7a-6ba0-4d41-b16d-03dd512861eb
+# ╔═╡ 97e653ee-91a7-483a-aff6-b6b23a4060da
+### TO DO
+# Quasi MC - qmcPy for new samples
+# Coloured by RMSE plots 
+
+# ╔═╡ 5569dfed-61ed-4b8d-9d52-cbd23929cba8
+md"""
+We add further insight to the above plot by viewing runs coloured by their respective RMSE values indicating their proximity to the observed data."""
+
+# ╔═╡ 51c79087-d6c4-43c8-a55e-501f21a9e6fd
+md"""
+![](SolarMinimum_BrF_PoyntingFlux_rmseNp.png)
+"""
+
+# ╔═╡ 6f4f9d93-6ade-4485-ad7e-ff0efb2a9e1f
 
 
-# ╔═╡ 8a553dca-f416-4302-8682-e7537e39e0cf
-# begin
-	
-# 	contour(BrFactor, PoyntingFlux, energy, f=true, nlev=7, c=ccol)
-# 	scatter!(successful_runs_Np[!, name_x], 
-# 			successful_runs_Np[!, name_y],
-# 			label = "Successful Runs ",
-# 			# markerstrokewidth=0, 
-# 			marker=cur_colors[1],
-# 			markersize=6)
-# 	scatter!(failed_runs_Np[!, name_x],
-# 			 failed_runs_Np[!, name_y], 
-# 			 label = "Failed Runs",
-# 			 # markerstrokewidth=0,
-# 			marker=cur_colors[2],
-# 		 	markersize=6)
-# 	scatter!(excluded_runs_Np[!, name_x],
-# 			 excluded_runs_Np[!, name_y], 
-# 			 label = "Excluded Runs",
-# 			 # markerstrokewidth=0,
-# 			 marker=cur_colors[3],
-# 			 markersize=6)
-	
-# 	annotate!(1.35 * minimum(ipTable[!, name_x]), 
-# 			1.02 * maximum(ipTable[!, name_y]), 
-# 			text("Successful", cur_colors[1], :above, 12, :bold))
-# 	annotate!(0.5 * (minimum(ipTable[!, name_x]) + maximum(ipTable[!, name_x])), 
-# 			1.02 * maximum(ipTable[!, name_y]), 
-# 			text("Failed", cur_colors[2], :above, 12, :bold))
-# 	annotate!(0.8 * maximum(ipTable[!, name_x]), 
-# 			1.02 * maximum(ipTable[!, name_y]), 
-# 			text("Excluded", cur_colors[3], :above, 12, :bold))
+# ╔═╡ cf6c8426-bbc7-4099-a5d4-ea6e507c74b4
+begin
+	metrics = DataFrame(CSV.File("../Outputs/QoIs/code_v_2021_05_17/event_list_2021_04_16_09/metrics.csv"))
+end
 
-# 	plot!(xlabel=name_x, ylabel=name_y)
-# 	plot!(legend=false)
-# 	plot!(title="Inputs coloured by excluded runs for Np")
-# 	# plot!(xlim=extrema(BrFactor))
-# 	# plot!(ylim=extrema(PoyntingFlux))
-# 	plot!(size=(1000, 800))
+# ╔═╡ 78e13f6f-004b-4819-96e9-d8c24361cf6b
+RMSE_Np = metrics.rmse_Np
 
-# end
+# ╔═╡ bf4d9d07-31c5-4857-a3b7-40cae1fe1da2
+df = DataFrame(BrFactor = ipTable[!, "BrFactor"],
+			   PoyntingFlux = ipTable[!, "PoyntingFlux"],
+			   RMSE = RMSE_Np)
 
-# ╔═╡ 9c8cd5eb-43f6-4bc2-b6d7-36ec963a3f58
-extrema(BrFactor)
+# ╔═╡ 45372f88-47aa-4d53-b765-192fd46e1ae6
+df |> @vlplot(:point, x=:BrFactor, y=:PoyntingFlux, color=:RMSE)
 
-# ╔═╡ ca849f81-4ca1-4ec6-8e25-aec1ff4cdd9c
-BrFactor
+# ╔═╡ 6dfc687d-c67e-4ceb-b75c-2f7d5cad0cb5
 
-# ╔═╡ a01fc407-26cc-4412-8da3-2685c018b740
-# plot(p1, p2, layout=(1, 2), size=(1500, 700))
 
 # ╔═╡ 8f843ed9-50ca-44e9-89bd-fdc615f6565c
 md"""
@@ -360,52 +306,33 @@ Source: [Plotting Decision Boundary For Classifiers](https://discourse.julialang
 # ╔═╡ 5120e0f5-f319-4410-a5ef-9a3c8879ca8c
 
 
-# ╔═╡ bd39187f-d680-47f8-b255-56601d4bd3f9
-md"""
-## Uniform sampling from product of BrFactor and Poynting Flux
-"""
-
-# ╔═╡ 87fe8deb-4d43-4904-87c7-84dc1092b500
-function getPFSample(BrF_Sample)
-    PF_Sample = rand(Uniform(0.3e6, 1.1e6))
-    if PF_Sample <= 7.7 * 10^5 / BrF_Sample
-        return PF_Sample
-    else
-        getPFSample(BrF_Sample)
-    end
-end
-
-
-# ╔═╡ 7046d902-981c-495d-b114-a087f907a91b
-
-
 # ╔═╡ Cell order:
 # ╠═c76ce670-0ea0-4d36-896f-105c51079928
 # ╠═c0e6912a-17cc-431b-9b0e-6b54e3480256
 # ╠═0a1f12f9-69c9-43be-a351-714398305c95
 # ╠═7eab8e8e-e39c-492b-a21f-3f4cffd5007f
 # ╠═9f41d95a-4fdb-4514-b9e3-8655db9064fb
+# ╠═aa61a977-fc14-4111-ba14-6991273c6607
+# ╠═13e4bc15-680a-4a05-84d0-9caf90764ab1
 # ╠═b1bd3c8b-9e7d-406e-a6d3-44345a5b94bb
-# ╠═d6b27006-2c3d-4280-bc30-2c8f279438c1
-# ╠═63d6bf11-581b-410e-b12a-b643a9f6e479
-# ╠═19c1dadb-73dc-4c50-aa2a-27fcb845e117
-# ╠═652708aa-a500-4616-9157-a89d27afe423
 # ╠═d445e43f-d88c-49b1-9f60-36a66662b73a
 # ╠═257eac68-7384-4202-89b6-5a847e6d67b7
 # ╠═31bddd16-626d-41e5-baff-c5d4aaa77b4a
 # ╠═c8c52ac0-5dfc-4d04-92ce-945c7f07999d
+# ╟─4cdf239c-f145-4ee4-a397-59a771570d93
 # ╟─9f7243a6-c363-44e7-a5ad-597d680d4715
 # ╟─e6d3978f-fbab-418e-96b3-35e15ab16d9a
-# ╟─f42db30c-5f02-4dec-aa07-3052ece1a245
 # ╠═280b8277-cee8-4b8b-8343-bfc84b44f82d
-# ╠═61ae8f7a-6ba0-4d41-b16d-03dd512861eb
-# ╠═8a553dca-f416-4302-8682-e7537e39e0cf
-# ╠═9c8cd5eb-43f6-4bc2-b6d7-36ec963a3f58
-# ╠═ca849f81-4ca1-4ec6-8e25-aec1ff4cdd9c
-# ╠═a01fc407-26cc-4412-8da3-2685c018b740
+# ╠═97e653ee-91a7-483a-aff6-b6b23a4060da
+# ╟─5569dfed-61ed-4b8d-9d52-cbd23929cba8
+# ╠═ba46b044-2ab6-4854-822d-592a4d6c3265
+# ╠═bf4d9d07-31c5-4857-a3b7-40cae1fe1da2
+# ╠═45372f88-47aa-4d53-b765-192fd46e1ae6
+# ╠═51c79087-d6c4-43c8-a55e-501f21a9e6fd
+# ╠═6f4f9d93-6ade-4485-ad7e-ff0efb2a9e1f
+# ╠═cf6c8426-bbc7-4099-a5d4-ea6e507c74b4
+# ╟─78e13f6f-004b-4819-96e9-d8c24361cf6b
+# ╠═6dfc687d-c67e-4ceb-b75c-2f7d5cad0cb5
 # ╟─8f843ed9-50ca-44e9-89bd-fdc615f6565c
 # ╠═70feeaa1-7fe3-409f-ab49-bc427b3d8dc4
 # ╠═5120e0f5-f319-4410-a5ef-9a3c8879ca8c
-# ╠═bd39187f-d680-47f8-b255-56601d4bd3f9
-# ╠═87fe8deb-4d43-4904-87c7-84dc1092b500
-# ╠═7046d902-981c-495d-b114-a087f907a91b
