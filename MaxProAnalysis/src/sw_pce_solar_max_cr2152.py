@@ -18,7 +18,8 @@ import random
 from sklearn import linear_model as lm
 import chaospy as cp
 
-import gsa_utils
+from src import gsa_utils
+
 
 from matplotlib.backends.backend_pdf import PdfPages
 

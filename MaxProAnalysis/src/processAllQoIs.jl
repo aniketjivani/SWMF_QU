@@ -1,6 +1,6 @@
 # Obtain all QoIs from simulation / observation files for successful MaxPro runs!
 # PWD should be MaxProAnalysis
-include("./src/MaxProAnalysis.jl")
+include("../src/MaxProAnalysis.jl")
 
 using Plots
 gr()
@@ -16,23 +16,28 @@ using Dates
 using JLD
 
 mg = "ADAPT"
-md = "AWSoM"
-cr = 2152
+md = "AWSoM2T"
+cr = 2208
 
-INPUTS_PATH ="./data/MaxPro_inputs_outputs_event_list_2021_06_02_21.txt"
-OUTPUTS_PATH = "./data/L1_runs_event_list_2021_06_02_21"
-QOIS_PATH = "./Outputs/QoIs/code_v_2021_05_17/event_list_2021_06_02_21"
+INPUTS_PATH =  "./data/QMC_Data_for_event_lists/revised_thresholds/X_design_QMC_masterList_solarMin_AWSoM_reducedThreshold.txt"
+OUTPUTS_PATH = joinpath("./data/", "event_list_2021_07_11_" * md * "_CR" * "$(cr)")
+QOIS_PATH = joinpath("./Outputs/QoIs/code_v_2021_05_17/", "event_list_2021_07_11_" * md * "_CR" * "$(cr)")
 
 ips, ipNames = readdlm(INPUTS_PATH, 
                         header=true, 
-                        ','
                         );
+ips = ips[1:100, 2:end]
+ipNames = ipNames[1:end-1]
 ipTable = DataFrame(ips, :auto);
 rename!(ipTable, vec(ipNames));
 
+REALIZATIONS_ADAPT = floor.(ipTable[:, :realization] * 11 .+ 1) .|> Int
+REALIZATIONS_ADAPT = [REALIZATIONS_ADAPT[i, :] for i in 1:size(ipTable, 1)]
+select!(ipTable, Not(:realization))
+insertcols!(ipTable, 10, :realization=>REALIZATIONS_ADAPT)
 
 
-IHData, IHColumns = readdlm(joinpath(OUTPUTS_PATH, "run001_AWSoM/trj_earth_n00005000.sat"), 
+IHData, IHColumns = readdlm(joinpath(OUTPUTS_PATH, "run001_" * "$(md)", "trj_earth_n00005000.sat"), 
                             header=true, 
                             skipstart=1
                             );
@@ -95,8 +100,8 @@ BObs  = BObs[1:end - 1, :];
 # println("Observation files processed and written.")
 
 ##### Simulation files #####
-tmPeriods = Dates.DateTime.(IHDF[!, :year], IHDF[!, :mo], IHDF[!, :dy], IHDF[!, :hr], IHDF[!, :mn], IHDF[!, :sc])
-save("./Outputs/QoIs/tmPeriods_earth_cr2152.jld", "tmPeriods", tmPeriods)
+# tmPeriods = Dates.DateTime.(IHDF[!, :year], IHDF[!, :mo], IHDF[!, :dy], IHDF[!, :hr], IHDF[!, :mn], IHDF[!, :sc])
+# save("./Outputs/QoIs/tmPeriods_earth_cr2152.jld", "tmPeriods", tmPeriods)
 
 dataTrajectory = "EARTH"
 # dataTrajectory = "STEREO-A"
@@ -109,15 +114,15 @@ simFilePrefix = Dict("EARTH" => "trj_earth",
                     )
 
 
-Ur = zeros(m, 200);
-Np = zeros(m, 200);
-T  = zeros(m, 200);
-B  = zeros(m, 200);
-for (runIdx, realization) in enumerate(ipTable[!, "REALIZATIONS_ADAPT"])
+Ur = zeros(m, 100);
+Np = zeros(m, 100);
+T  = zeros(m, 100);
+B  = zeros(m, 100);
+for (runIdx, realization) in enumerate(ipTable[!, "realization"])
 
 
     opFileName = joinpath(OUTPUTS_PATH, 
-                        "run" * @sprintf("%03d", runIdx) * "_AWSoM", 
+                        "run" * @sprintf("%03d", runIdx) * "_" * "$(md)", 
                         simFilePrefix[dataTrajectory] * "_n00005000.sat")
 
     if isfile(opFileName)
