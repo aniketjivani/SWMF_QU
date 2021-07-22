@@ -5,7 +5,7 @@ The SWQU-DA Update Document on Google Docs usually contains this.
 
 
 ## Brief Description
-The folder MaxProAnalysis contains all scripts, data and outputs related to analysis of 200 runs suggested by the MaxPro design. These are studied for solar min (CR2208) and solar max (CR2152) with ADAPT maps and AWSoM model. 
+The folder MaxProAnalysis contains all scripts, data and outputs related to analysis of 200 runs suggested by the MaxPro design, as well as new runs added by Quasi MC for comparing models AWSoM, AWSoMR and AWSoM2T. These are studied for solar min (CR2208) and solar max (CR2152) with ADAPT maps and AWSoM model. 
 
 Under MaxProAnalysis:
 
@@ -15,6 +15,9 @@ Under MaxProAnalysis:
   * Link to Solar Min QoIs: [Solar Minimum QoIs](https://github.com/danieliong/SWMF_QU/tree/metrics/MaxProAnalysis/Outputs/QoIs/code_v_2021_05_17/event_list_2021_04_16_09)
    
   * Link to Solar Max QoIs: [Solar Maximum QoIs](https://github.com/danieliong/SWMF_QU/tree/metrics/MaxProAnalysis/Outputs/QoIs/code_v_2021_05_17/event_list_2021_06_02_21)
+
+
+  * Link to QoIs for AWSoM, AWSoMR, AWSoM2T (min and max): all folders under `MaxProAnalysis/Outputs/QoIs/code_v_2021_05_17` with the format `event_list_2021_07_11_MODEL_CR####`, for example: `event_list_2021_07_11_AWSoM_CR2152`. 
   
   * Format: 
 
