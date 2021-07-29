@@ -103,8 +103,12 @@ function get_metrics_table(sim, obs, qois, params, shift_params=["timeshift", "T
     return df
 end
 
-inputs_outputs = CSV.read(INPUTS_OUTPUTS_PATH, DataFrame)[1:200,:]
+# inputs_outputs = CSV.read(INPUTS_OUTPUTS_PATH, DataFrame)[1:200,:]
+
+inputs_outputs = CSV.read(INPUTS_OUTPUTS_PATH, DataFrame)[1:100, :]
 obs, sim = create_axisarray(1:720, QOIS, 1:size(inputs_outputs)[1])
-metrics_df = get_metrics_table(sim, obs, QOIS, 1:200)
+# metrics_df = get_metrics_table(sim, obs, QOIS, 1:200) # Used for 200 runs in MaxPro
+
+metrics_df = get_metrics_table(sim, obs, QOIS, 1:100)
 results_df = hcat(inputs_outputs, metrics_df)
 CSV.write(RESULTS_PATH, results_df)
