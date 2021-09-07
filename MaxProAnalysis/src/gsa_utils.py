@@ -162,3 +162,13 @@ def interaction_effect_heatmap(si, interaction_effects, slice_index=None, fig=No
     
     
     return fig, ax
+
+
+
+# %% Define functions to process and calculate sobol indices
+
+
+
+
+
+

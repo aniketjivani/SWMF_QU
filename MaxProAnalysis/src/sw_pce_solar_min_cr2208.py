@@ -5,6 +5,9 @@ Created on Tue Jun  1 11:11:14 2021
 
 @author: ajivani
 """
+# Uses runs from MaxProAnalysis/Outputs/QoIs/code_v_2021_05_17/event_list_2021_04_16_09
+# Working directory is MaxProAnalysis (all paths specified relative to this)
+
 import numpy as np
 import matplotlib.pyplot as plt 
 import pandas as pd
@@ -15,7 +18,7 @@ import re
 from sklearn import linear_model as lm
 import chaospy as cp
 
-import gsa_utils
+from src import gsa_utils # gsa_utils.py contains routines to make plots related to sobol indices
 
 from matplotlib.backends.backend_pdf import PdfPages
 
@@ -31,6 +34,7 @@ rMinWaveReflection = cp.Uniform(-1, 1)
 
 
 # %% Build for ADAPT and AWSoM
+qoi = "Np" # Choose "Ur" or "Np" (most relevant)
 
 pce_inputs = ['BrMin', 'BrFactor_ADAPT', 'nChromoSi_AWSoM', 'PoyntingFluxPerBSi', 'LperpTimesSqrtBSi', 'StochasticExponent', 'rMinWaveReflection']
 
@@ -41,15 +45,13 @@ polynomial_order = 2
 
 # %% process data
 
+# Load file for i/p params
 ips_ops = pd.read_csv("./data/MaxPro_inputs_outputs_event_list_2021_04_16_09.txt")
 
 
-np_less_than_100 = np.loadtxt("./Outputs/QoIs/code_v_2021_05_17/event_list_2021_04_16_09/np_less_than_hundred.txt", dtype='int')
+runs_to_keep = np.loadtxt("./Outputs/QoIs/code_v_2021_05_17/event_list_2021_04_16_09/runs_to_keep.txt", dtype='int')
 
-removed_runs = np.setdiff1d(np.array(range(200)) + 1, np_less_than_100)
-ips_ops_successful = ips_ops.drop(labels = removed_runs - 1, axis=0)
-
-
+ips_ops_successful = ips_ops.iloc[runs_to_keep - 1] # runs_to_keep is 1 indexed
 
 selected_ips = ips_ops_successful[pce_inputs]
 lb = np.array([5.0, 0.54, 2e17, 0.3e6, 0.3e5, 0.1, 1])
@@ -60,15 +62,12 @@ samples = np.array(selected_ips_std)
 samples = samples.T
 
 # %% get sobol and interaction indices for individual QoIs
-qoi = "Np"
+
 
 simFileName = os.path.join("./Outputs/QoIs/code_v_2021_05_17/event_list_2021_04_16_09", qoi + "Sim_earth.txt")
 
-
-# simFileName = os.path.join("./data/code_v_2021_05_17/event_list_2021_04_16_09", qoi + "Sim_earth_trimmed_shifted.txt")
-
 qoiArray = np.loadtxt(simFileName)
-qoiArrayS = np.delete(qoiArray, removed_runs - 1, axis=1)
+qoiArrayS = qoiArray[:, runs_to_keep - 1]
 
 
 m, n = qoiArrayS.shape

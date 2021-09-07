@@ -16,17 +16,17 @@ using Dates
 using JLD
 
 mg = "ADAPT"
-md = "AWSoM2T"
+md = "AWSoM"
 cr = 2208
 
-INPUTS_PATH =  "./data/QMC_Data_for_event_lists/revised_thresholds/X_design_QMC_masterList_solarMin_AWSoM_reducedThreshold.txt"
-OUTPUTS_PATH = joinpath("./data/", "event_list_2021_07_11_" * md * "_CR" * "$(cr)")
-QOIS_PATH = joinpath("./Outputs/QoIs/code_v_2021_05_17/", "event_list_2021_07_11_" * md * "_CR" * "$(cr)")
+INPUTS_PATH =  "./data/QMC_Data_for_event_lists/revised_thresholds/X_design_QMC_masterList_solarMax_AWSoM_reducedThreshold.txt"
+OUTPUTS_PATH = joinpath("./data/", "event_list_2021_07_30_" * md * "_CR" * "$(cr)")
+QOIS_PATH = joinpath("./Outputs/QoIs/code_v_2021_05_17/", "event_list_2021_07_30_" * md * "_CR" * "$(cr)")
 
 ips, ipNames = readdlm(INPUTS_PATH, 
                         header=true, 
                         );
-ips = ips[1:100, 2:end]
+ips = ips[101:600, 2:end] # runs 101:600 for event list of 2021-07-30
 ipNames = ipNames[1:end-1]
 ipTable = DataFrame(ips, :auto);
 rename!(ipTable, vec(ipNames));
@@ -37,7 +37,7 @@ select!(ipTable, Not(:realization))
 insertcols!(ipTable, 10, :realization=>REALIZATIONS_ADAPT)
 
 
-IHData, IHColumns = readdlm(joinpath(OUTPUTS_PATH, "run001_" * "$(md)", "trj_earth_n00005000.sat"), 
+IHData, IHColumns = readdlm(joinpath(OUTPUTS_PATH, "run101_" * "$(md)", "trj_earth_n00005000.sat"), 
                             header=true, 
                             skipstart=1
                             );
@@ -114,15 +114,15 @@ simFilePrefix = Dict("EARTH" => "trj_earth",
                     )
 
 
-Ur = zeros(m, 100);
-Np = zeros(m, 100);
-T  = zeros(m, 100);
-B  = zeros(m, 100);
+Ur = zeros(m, 500);
+Np = zeros(m, 500);
+T  = zeros(m, 500);
+B  = zeros(m, 500);
 for (runIdx, realization) in enumerate(ipTable[!, "realization"])
 
 
     opFileName = joinpath(OUTPUTS_PATH, 
-                        "run" * @sprintf("%03d", runIdx) * "_" * "$(md)", 
+                        "run" * @sprintf("%03d", runIdx + 100) * "_" * "$(md)", 
                         simFilePrefix[dataTrajectory] * "_n00005000.sat")
 
     if isfile(opFileName)

@@ -2,8 +2,12 @@
 # -*- coding: utf-8 -*-
 
 """
-Currently for unshifted runs. 
+Currently for unshifted runs. Shifting runs does not make a significant difference to trends from sensitivity analysis, but its a good point to start. 
 """
+
+# Uses runs from MaxProAnalysis/Outputs/QoIs/code_v_2021_05_17/event_list_2021_04_16_09
+# Working directory is MaxProAnalysis (all paths specified relative to this)
+# variables to focus on: samples, evaluations, model_approximation, sobol_indices and interaction effects. 
 
 
 import numpy as np
@@ -37,6 +41,8 @@ StochasticExponent = cp.Uniform(-1, 1)
 rMinWaveReflection = cp.Uniform(-1, 1)
 # %% Build for ADAPT and AWSoM
 
+qoi = "Np"
+
 pce_inputs = ['BrMin', 'BrFactor_ADAPT', 'nChromoSi_AWSoM', 'PoyntingFluxPerBSi', 'LperpTimesSqrtBSi', 'StochasticExponent', 'rMinWaveReflection']
 
 distribution = cp.J(BrMin, BrFactor_ADAPT, nChromoSi_AWSoM, PoyntingFluxPerBSi, LperpTimeSqrtBSi, StochasticExponent, rMinWaveReflection)
@@ -48,12 +54,8 @@ polynomial_order = 2
 
 ips_ops = pd.read_csv("./data/MaxPro_inputs_outputs_event_list_2021_06_02_21.txt")
 
-
-removed_runs = np.loadtxt("./Outputs/QoIs/code_v_2021_05_17/event_list_2021_06_02_21/removed_runs.txt", dtype='int')
-
-
-np_runs_to_keep = np.loadtxt("./Outputs/QoIs/code_v_2021_05_17/event_list_2021_06_02_21/np_less_than_hundred.txt", dtype='int')
-ips_ops_successful = ips_ops.iloc[np_runs_to_keep - 1]
+runs_to_keep = np.loadtxt("./Outputs/QoIs/code_v_2021_05_17/event_list_2021_06_02_21/runs_to_keep.txt", dtype='int')
+ips_ops_successful = ips_ops.iloc[runs_to_keep - 1]
 
 
 
@@ -67,12 +69,12 @@ samples = np.array(selected_ips_std)
 samples = samples.T
 # %% 
 
-qoi = "Np"
+
 
 simFileName = os.path.join("./Outputs/QoIs/code_v_2021_05_17/event_list_2021_06_02_21", qoi + "Sim_earth.txt")
 
 qoiArray = np.loadtxt(simFileName)
-qoiArrayS = qoiArray[:, np_runs_to_keep - 1]
+qoiArrayS = qoiArray[:, runs_to_keep - 1]
 
 m, n = qoiArrayS.shape
 evaluations = qoiArrayS.T[:, 0:m]

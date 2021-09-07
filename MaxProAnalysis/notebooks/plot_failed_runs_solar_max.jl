@@ -80,7 +80,7 @@ end
 
 # ╔═╡ d6b27006-2c3d-4280-bc30-2c8f279438c1
 # we remove all runs where Np value exceeds 100 - this left behind 69 runs out of a possible 191.
-np_runs_to_keep = readdlm("../Outputs/QoIs/code_v_2021_05_17/event_list_2021_06_02_21/np_less_than_hundred.txt", Int64)[:]
+np_runs_to_keep = readdlm("../Outputs/QoIs/code_v_2021_05_17/event_list_2021_06_02_21/runs_to_keep.txt", Int64)[:]
 
 # ╔═╡ 63d6bf11-581b-410e-b12a-b643a9f6e479
 # these runs are removed on the basis of Ur being less than 200! (overall criterion is: 200 < Ur < 900 km / s)
@@ -336,12 +336,12 @@ begin
 			 markerstrokewidth=2,
 			 marker=cur_colors[3],
 			 markersize=7)
-	scatter!(successful_runs_UrNp[!, x_var],
-		 successful_runs_UrNp[!, y_var], 
-		 markerstrokewidth=2,
-		 marker=cur_colors[4],
-		 markersize=7)
-	plot!(BrFactor, 7*10^5 ./BrFactor, linewidth=3)
+	# scatter!(successful_runs_UrNp[!, x_var],
+	# 	 successful_runs_UrNp[!, y_var], 
+	# 	 markerstrokewidth=2,
+	# 	 marker=cur_colors[4],
+	# 	 markersize=7)
+	# plot!(BrFactor, 7*10^5 ./BrFactor, linewidth=3)
 	plot!(BrFactor, 6*10^5 ./BrFactor, linewidth=3)
 	annotate!(1.35 * minimum(ipTable[!, x_var]), 
 			1.02 * maximum(ipTable[!, y_var]), 
@@ -355,7 +355,7 @@ begin
 
 	plot!(xlabel=x_var, ylabel=y_var)
 	plot!(legend=false)
-	plot!(title="Inputs coloured by excluded runs for Np")
+	plot!(title="Inputs coloured by successful and excluded runs")
 	plot!(xlim=(0.5, 2.7))
 	plot!(ylim=(2.5e5, 1.1e6))
 	# plot!(xlim=extrema(BrFactor))
@@ -563,8 +563,8 @@ md"""
 # ╠═71b05da6-6dee-4e3b-be8c-e7bc6cb2186c
 # ╟─f42db30c-5f02-4dec-aa07-3052ece1a245
 # ╟─70c53dba-76f6-471e-baed-1c17d47a5f8d
-# ╟─280b8277-cee8-4b8b-8343-bfc84b44f82d
-# ╟─61ae8f7a-6ba0-4d41-b16d-03dd512861eb
+# ╠═280b8277-cee8-4b8b-8343-bfc84b44f82d
+# ╠═61ae8f7a-6ba0-4d41-b16d-03dd512861eb
 # ╠═8a553dca-f416-4302-8682-e7537e39e0cf
 # ╠═9c8cd5eb-43f6-4bc2-b6d7-36ec963a3f58
 # ╠═ca849f81-4ca1-4ec6-8e25-aec1ff4cdd9c
